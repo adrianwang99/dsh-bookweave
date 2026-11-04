@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.10.1] - 2025-11-04
+
+- The right-rail guide now opens on the chapter you are currently reading (using saved progress) and follows TOC / prev-next / locate chapter changes.
+
 ## [0.10.0] - 2025-11-04
 
 - Book search is now configurable: Book list → **Search source** edits a URL template (`{query}` = title). Default is Open Library; no hardcoded third-party book site remains.

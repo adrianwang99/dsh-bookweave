@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.10.0';
+    const CLIENT_VERSION = '0.10.1';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -2961,7 +2961,7 @@ window.__ModuleLoader__.load({
       const [chapterIndex, setChapterIndex] = React.useState(() => Math.min(Math.max(0, initial.chapterIndex | 0), Math.max(0, chapters.length - 1)));
       const [showToc, setShowToc] = React.useState(false);
       const [showRail, setShowRail] = React.useState(true);
-      const [structureChapter, setStructureChapter] = React.useState(0);
+      const [structureChapter, setStructureChapter] = React.useState(() => chapterIndex);
       const [insight, setInsight] = React.useState(null);
       const [sourceFocus, setSourceFocus] = React.useState(null);
       const [flashBlock, setFlashBlock] = React.useState(null);
@@ -3063,6 +3063,10 @@ window.__ModuleLoader__.load({
           alive = false;
         };
       }, [tab, structureChapter, record.id]);
+
+      React.useEffect(() => {
+        setStructureChapter(chapterIndex);
+      }, [chapterIndex]);
 
       React.useEffect(
         () => () => {
