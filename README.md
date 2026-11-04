@@ -33,13 +33,19 @@ BookWeave is a [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-
 
 **Requirements** — a DeepSeek Harness build with the Web UI. The AI half additionally needs the Host `llm` service (any provider that DSH can already call); without it, reading, excerpts, book lists and the heuristic guide still work.
 
-### From npm (after release)
+### From GitHub (available now)
+
+```sh
+dsh plugin add github:adrianwang99/dsh-bookweave
+```
+
+### From npm (after the first npm release)
 
 ```sh
 dsh plugin add dsh-bookweave
 ```
 
-### From source (recommended while the package is new)
+### From source (for development)
 
 ```sh
 git clone https://github.com/adrianwang99/dsh-bookweave.git

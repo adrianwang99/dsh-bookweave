@@ -32,13 +32,19 @@
 
 **要求** —— 带 Web UI 的 DeepSeek Harness。AI 部分额外需要 Host 的 `llm` 服务（DSH 已能调用的任意模型供应商）；没有它，阅读、摘录、书单和启发式导览仍然可用。
 
-### 从 npm 安装（发布后）
+### 从 GitHub 安装（现在就能用）
+
+```sh
+dsh plugin add github:adrianwang99/dsh-bookweave
+```
+
+### 从 npm 安装（首次发布后）
 
 ```sh
 dsh plugin add dsh-bookweave
 ```
 
-### 从源码安装（包刚发布时推荐）
+### 从源码安装（开发用）
 
 ```sh
 git clone https://github.com/adrianwang99/dsh-bookweave.git
