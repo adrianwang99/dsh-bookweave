@@ -1,0 +1,4 @@
+# 书脉 BookWeave：插入本地插件行
+- insert:
+    - id: dsh-bookweave
+      name: 'dsh-bookweave'

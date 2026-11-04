@@ -1,0 +1,47 @@
+{
+  "zh-basic.epub": {
+    "chapters": 5,
+    "title": "测试之书",
+    "author": "测试作者",
+    "expectedBooks": {
+      "红楼梦": 3,
+      "百年孤独": 2,
+      "人类简史": 2,
+      "活着": 1,
+      "文心雕龙": 1
+    }
+  },
+  "gbk-encoded.epub": {
+    "chapters": 2,
+    "title": "国学札记",
+    "author": "测试作者",
+    "expectedBooks": {
+      "论语": 2,
+      "道德经": 1
+    }
+  },
+  "no-toc.epub": {
+    "chapters": 2,
+    "title": "读史札记",
+    "author": "测试作者",
+    "expectedBooks": {
+      "史记": 2
+    }
+  },
+  "stored-entries.epub": {
+    "chapters": 2,
+    "title": "书斋随笔",
+    "author": "测试作者",
+    "expectedBooks": {
+      "围城": 2
+    }
+  },
+  "percent-href.epub": {
+    "chapters": 3,
+    "title": "行旅小记",
+    "author": "测试作者",
+    "expectedBooks": {
+      "边城": 2
+    }
+  }
+}

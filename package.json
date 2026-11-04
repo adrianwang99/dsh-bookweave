@@ -1,0 +1,69 @@
+{
+  "name": "dsh-bookweave",
+  "version": "0.8.1",
+  "type": "module",
+  "description": "EPUB reader plugin for DeepSeek Harness: shelf, excerpts, a book list of every mentioned title, and an AI chapter guide with source-linked cards.",
+  "license": "MIT",
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "epub",
+    "reader",
+    "books"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client/client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client/client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "plugin.json",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "author": {
+    "name": "adrianwang99",
+    "url": "https://github.com/adrianwang99"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adrianwang99/dsh-bookweave.git"
+  },
+  "homepage": "https://github.com/adrianwang99/dsh-bookweave#readme",
+  "bugs": {
+    "url": "https://github.com/adrianwang99/dsh-bookweave/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "node test/run.mjs && node test/parse-archives.mjs && node test/structure.mjs && node test/host.mjs",
+    "test:core": "node test/run.mjs",
+    "test:archives": "node test/parse-archives.mjs",
+    "test:structure": "node test/structure.mjs",
+    "test:host": "node test/host.mjs",
+    "check": "node --check client/client.js && node --check index.js",
+    "pack:zip": "rm -f ../dsh-bookweave-$(node -p \"require('./package.json').version\").zip && zip -r ../dsh-bookweave-$(node -p \"require('./package.json').version\").zip . -x \"node_modules/*\" \".git/*\" \"*.tgz\""
+  }
+}

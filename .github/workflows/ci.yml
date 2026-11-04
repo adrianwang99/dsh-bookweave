@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Syntax check
+        run: |
+          node --check client/client.js
+          node --check index.js
+
+      - name: Core suite
+        run: node test/run.mjs
+
+      - name: Archive & cover suite
+        run: node test/parse-archives.mjs
+
+      - name: Structure suite
+        run: node test/structure.mjs
+
+      - name: Host AI suite
+        run: node test/host.mjs
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Fixture integrity
+        run: python3 test/fixtures/verify_fixtures.py

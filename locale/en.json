@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "BookWeave",
+    "description": "An EPUB reader in the sidebar that collects every book mentioned in the text into an exportable reading list and a knowledge graph. Files are parsed locally."
+  }
+}

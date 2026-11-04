@@ -1,0 +1,40 @@
+{
+  "name": "dsh-bookweave",
+  "title": {
+    "zh": "书脉",
+    "en": "BookWeave"
+  },
+  "description": {
+    "zh": "在 DSH 左侧栏阅读 EPUB，自动生成全书引书书单与知识网络，并提供可点击溯源的 AI 章节导览。",
+    "en": "Read EPUBs inside DSH, build a book list of every title the text mentions, and explore an AI chapter guide whose cards link back to the source paragraphs."
+  },
+  "version": "0.8.1",
+  "author": {
+    "name": "adrianwang99",
+    "url": "https://github.com/adrianwang99"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/adrianwang99/dsh-bookweave",
+  "repository": "https://github.com/adrianwang99/dsh-bookweave",
+  "icon": "icon.svg",
+  "category": "ui",
+  "keywords": [
+    "deepseek",
+    "harness",
+    "dsh",
+    "dsh-plugin",
+    "epub",
+    "reader",
+    "book-list",
+    "excerpts",
+    "ai"
+  ],
+  "entries": {
+    "host": "index.js",
+    "client": "client/client.js",
+    "bundle": "cordis.patch.yml"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
