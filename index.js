@@ -18,6 +18,8 @@ const MAX_PROMPT_CHARS = 8000;
 const MAX_OUTPUT_TOKENS = 700;
 const REQUEST_TIMEOUT_MS = 90000;
 
+const RELATIONS = new Set(['reason', 'example', 'data', 'authority', 'contrast', 'definition']);
+
 const SYSTEM_PROMPT = [
   '你是「书脉」的阅读结构分析助手。',
   '只输出一个 JSON 对象，不要 Markdown 围栏、不要解释、不要前后缀。',
@@ -111,7 +113,10 @@ function normalizeInsight(raw, allowed) {
         .map((item) => {
           const evidenceBlock = blockNumber(item && item.block, allowed);
           const evidenceText = clip(item && item.text, 120);
-          return evidenceBlock === null || !evidenceText ? null : { text: evidenceText, block: evidenceBlock };
+          if (evidenceBlock === null || !evidenceText) return null;
+          const relation = item && RELATIONS.has(item.relation) ? item.relation : '';
+          const link = clip(item && item.link, 24);
+          return { text: evidenceText, block: evidenceBlock, relation, link };
         })
         .filter(Boolean)
         .slice(0, 2);
@@ -136,9 +141,10 @@ function buildPrompt(input) {
     '1. 判断本章是叙事类（小说/传记/故事）还是论述类（非虚构/学术/方法）。',
     '2. 叙事类：用与原书一致的叙述人称、时态和语感（保留原文用词，不要评论口吻）写 2–4 句情节概括；给出 3–5 个情节节点，每个一句话并标注段落编号。',
     '3. 论述类：先用 2–3 句概括本章在讲什么（summary），再提炼 3–5 个核心观点，每个观点 1–2 条论据，都必须标注段落编号；论据尽量用原文里的例子、事实或数据。',
+    '   每条论据必须带 relation 字段，取值只能是 reason（原因/因为）、example（例子/例如）、data（数据/统计）、authority（研究/权威）、contrast（反例/对比）、definition（定义/解释）之一；可用 link 给一个不超过 12 字的连接词（如“因为”“例如”“数据显示”）。',
     '只输出二选一的严格 JSON：',
     '{"mode":"fiction","summary":"…","beats":[{"text":"…","block":12}]}',
-    '{"mode":"nonfiction","summary":"…","claims":[{"text":"…","block":3,"evidence":[{"text":"…","block":5}]}]}',
+    '{"mode":"nonfiction","summary":"…","claims":[{"text":"…","block":3,"evidence":[{"text":"…","block":5,"relation":"reason","link":"因为"}]}]}',
   ]
     .filter((line) => line !== '')
     .join('\n');

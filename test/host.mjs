@@ -100,6 +100,18 @@ const nonfiction = __test.normalizeInsight(
 check('nonfiction 只保留合法论据', nonfiction.claims.length === 1 && nonfiction.claims[0].evidence.length === 1, JSON.stringify(nonfiction));
 check('无法解析的输出返回 null', __test.normalizeInsight({ mode: 'other' }, allowed) === null && __test.normalizeInsight(null, allowed) === null);
 
+const withRelation = __test.normalizeInsight(
+  { mode: 'nonfiction', claims: [{ text: '观点', block: 0, evidence: [{ text: '证据', block: 9, relation: 'data', link: '数据显示' }] }] },
+  allowed
+);
+check('论据关系被保留', withRelation.claims[0].evidence[0].relation === 'data' && withRelation.claims[0].evidence[0].link === '数据显示', JSON.stringify(withRelation));
+const badRelation = __test.normalizeInsight(
+  { mode: 'nonfiction', claims: [{ text: '观点', block: 0, evidence: [{ text: '证据', block: 9, relation: 'made-up' }] }] },
+  allowed
+);
+check('非法关系被丢弃', badRelation.claims[0].evidence[0].relation === '', JSON.stringify(badRelation));
+
+
 // 3. 最低 reasoning 档
 check('reasoning 取最低档', __test.lowestEffort({ reasoning: { efforts: [{ id: 'max' }, { id: 'off' }, { id: 'high' }] } }) === 'off');
 

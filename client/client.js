@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.8.1';
+    const CLIENT_VERSION = '0.9.0';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -1954,6 +1954,31 @@ window.__ModuleLoader__.load({
       '.bw-block--focus{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 9%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 22%,transparent)}',
       '.bw-block--flash{animation:bw-flash 1.6s ease}',
       '@keyframes bw-flash{0%{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 20%,transparent)}70%{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent)}100%{background:transparent}}',
+      '.bw-arg{border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-base);padding:10px;display:flex;flex-direction:column;gap:6px}',
+      '.bw-arg__claim{display:flex;flex-direction:column;gap:4px}',
+      '.bw-arg__badge{align-self:flex-start;display:inline-flex;align-items:center;height:17px;padding:0 5px;border-radius:4px;background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary-foreground);font-size:10px;font-weight:650}',
+      '.bw-arg__text{font:inherit;font-size:12.5px;font-weight:600;line-height:1.6;text-align:left;background:none;border:0;padding:0;color:var(--dsw-alias-label-primary);cursor:pointer;word-break:break-word}',
+      '.bw-arg__text:hover{color:var(--dsw-alias-brand-primary)}',
+      '.bw-arg__text:focus-visible,.bw-arg__ev:focus-visible,.bw-chain__text:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:2px}',
+      '.bw-arg__link{display:flex;align-items:center;gap:6px;color:var(--dsw-alias-label-secondary);font-size:10.5px;padding-left:6px}',
+      '.bw-arg__arrow{width:0;height:0;border:5px solid transparent;border-bottom-color:var(--dsw-alias-brand-primary);margin-bottom:2px}',
+      '.bw-arg__evidence{list-style:none;margin:0;padding:0 0 0 14px;position:relative;display:flex;flex-direction:column;gap:6px}',
+      '.bw-arg__evidence::before{content:"";position:absolute;left:4px;top:0;bottom:8px;width:2px;border-radius:2px;background:var(--dsw-alias-border-l2)}',
+      '.bw-arg__ev{position:relative;display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;font:inherit;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l1);border-radius:8px;padding:7px 9px;cursor:pointer}',
+      '.bw-arg__ev::before{content:"";position:absolute;left:-12px;top:16px;width:10px;height:2px;background:var(--dsw-alias-border-l2)}',
+      '.bw-arg__ev:hover{border-color:var(--dsw-alias-brand-primary)}',
+      '.bw-arg__evbadge{align-self:flex-start;display:inline-flex;align-items:center;height:16px;padding:0 5px;border-radius:4px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:10px;font-weight:650}',
+      '.bw-arg__evtext{font-size:12px;line-height:1.6;color:var(--dsw-alias-label-primary);word-break:break-word}',
+      '.bw-arg__noevidence{font-size:10.5px;color:var(--dsw-alias-label-secondary)}',
+      '.bw-chain{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}',
+      '.bw-chain__item{position:relative;display:flex;gap:8px;padding-bottom:12px}',
+      '.bw-chain__item:last-child{padding-bottom:0}',
+      '.bw-chain__item::before{content:"";position:absolute;left:8px;top:20px;bottom:0;width:2px;border-radius:2px;background:var(--dsw-alias-border-l2)}',
+      '.bw-chain__item:last-child::before{display:none}',
+      '.bw-chain__node{flex:none;width:16px;height:16px;border-radius:50%;background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary-foreground);font-size:10px;display:flex;align-items:center;justify-content:center;margin-top:2px;z-index:1}',
+      '.bw-chain__body{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:4px}',
+      '.bw-chain__text{font:inherit;font-size:12px;line-height:1.65;text-align:left;background:none;border:0;padding:0;color:var(--dsw-alias-label-primary);cursor:pointer;word-break:break-word}',
+      '.bw-chain__text:hover{color:var(--dsw-alias-brand-primary)}',
       '.bw-gcard__quote{font-size:11px;line-height:1.6;color:var(--dsw-alias-label-secondary);border-left:2px solid var(--dsw-alias-border-l2);padding-left:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}',
       '.bw-gcard__quote--evidence{font-size:10.5px;margin-top:2px;flex-basis:100%}',
       '.bw-evidence{flex-wrap:wrap}',
@@ -3500,6 +3525,29 @@ window.__ModuleLoader__.load({
       }
       cards = cards.slice().sort((a, b) => a.block - b.block);
 
+      function relationKey(relation) {
+        if (relation === 'example') return 'relationExample';
+        if (relation === 'data') return 'relationData';
+        if (relation === 'authority') return 'relationAuthority';
+        if (relation === 'contrast') return 'relationContrast';
+        if (relation === 'definition') return 'relationDefinition';
+        return 'relationReason';
+      }
+      function inferRelation(text) {
+        const value = String(text || '');
+        if (/例如|比如|譬如|举例|such as|for example/i.test(value)) return 'example';
+        if (/数据显示|统计|数字|百分比|\d+%|survey|percent/i.test(value)) return 'data';
+        if (/研究表明|研究显示|专家|学者|调查|study|research/i.test(value)) return 'authority';
+        if (/相反|然而|但是|反例|however|in contrast/i.test(value)) return 'contrast';
+        if (/是指|定义|意味着|defined|refers to/i.test(value)) return 'definition';
+        if (/因为|由于|原因|because|since|due to/i.test(value)) return 'reason';
+        return 'reason';
+      }
+      function relationLabel(evidence) {
+        if (evidence && evidence.link) return String(evidence.link).slice(0, 24);
+        return t(relationKey((evidence && evidence.relation) || inferRelation(evidence && evidence.text)));
+      }
+
       return h(
         'section',
         { className: 'bw-guide', 'aria-label': t('guideTitle') },
@@ -3574,56 +3622,102 @@ window.__ModuleLoader__.load({
           : h('div', { className: 'bw-guide__hint' }, loading ? t('aiLoading') : t('guideNoSummary')),
         aiDone && aiDone.truncated ? h('div', { className: 'bw-guide__hint' }, t('aiTruncated')) : null,
         cards.length
-          ? h(
-              'ul',
-              { className: 'bw-guide__cards' },
-              cards.map((card, index) =>
-                h(
-                  'li',
-                  { key: 'card-' + index },
+          ? aiMode === 'fiction'
+            ? h(
+                'ol',
+                { className: 'bw-chain', 'aria-label': t('guidePlotChain') },
+                cards.map((card, index) =>
                   h(
-                    'button',
-                    {
-                      type: 'button',
-                      className: 'bw-gcard',
-                      onClick: () => props.onJump(current.index, card.block),
-                      onMouseEnter: () => focusSource(card.block),
-                      onMouseLeave: () => focusSource(null),
-                      onFocus: () => focusSource(card.block),
-                      onBlur: () => focusSource(null),
-                    },
-                    h('span', { className: 'bw-gcard__badge' }, card.kind === 'beat' ? t('guideCardBeat') : t('guideCardClaim')),
-                    h('span', { className: 'bw-gcard__text' }, card.text),
-                    sourceQuote(card.block) ? h('span', { className: 'bw-gcard__quote' }, '「' + sourceQuote(card.block) + '」') : null,
-                    h('span', { className: 'bw-gcard__loc' }, t('guideOriginal') + ' · ' + t('structureLoc').replace('{chapter}', String(current.index + 1)).replace('{block}', String(card.block + 1)))
-                  ),
-                  card.evidence.length
-                    ? h(
-                        'div',
-                        { className: 'bw-gcard__evidence' },
-                        card.evidence.map((evidence, evidenceIndex) =>
-                          h(
-                            'button',
-                            {
-                              key: 'ev-' + evidenceIndex,
-                              type: 'button',
-                              className: 'bw-evidence',
-                              onClick: () => props.onJump(current.index, evidence.block),
-                              onMouseEnter: () => focusSource(evidence.block),
-                              onMouseLeave: () => focusSource(null),
-                              onFocus: () => focusSource(evidence.block),
-                              onBlur: () => focusSource(null),
-                            },
-                            h('span', { className: 'bw-evidence__badge' }, t('structureEvidence')),
-                            h('span', { className: 'bw-evidence__text' }, evidence.text),
-                            sourceQuote(evidence.block) ? h('span', { className: 'bw-gcard__quote bw-gcard__quote--evidence' }, '「' + sourceQuote(evidence.block) + '」') : null
-                          )
-                        )
-                      )
-                    : null
+                    'li',
+                    { key: 'beat-' + index, className: 'bw-chain__item' },
+                    h('span', { className: 'bw-chain__node' }, String(index + 1)),
+                    h(
+                      'div',
+                      { className: 'bw-chain__body' },
+                      h(
+                        'button',
+                        {
+                          type: 'button',
+                          className: 'bw-chain__text',
+                          onClick: () => props.onJump(current.index, card.block),
+                          onMouseEnter: () => focusSource(card.block),
+                          onMouseLeave: () => focusSource(null),
+                          onFocus: () => focusSource(card.block),
+                          onBlur: () => focusSource(null),
+                        },
+                        card.text
+                      ),
+                      sourceQuote(card.block) ? h('span', { className: 'bw-gcard__quote' }, '「' + sourceQuote(card.block) + '」') : null,
+                      h('span', { className: 'bw-gcard__loc' }, t('guideOriginal') + ' · ' + t('structureLoc').replace('{chapter}', String(current.index + 1)).replace('{block}', String(card.block + 1)))
+                    )
+                  )
                 )
               )
-            )
+            : h(
+                'ul',
+                { className: 'bw-guide__cards bw-guide__cards--args' },
+                cards.map((card, index) =>
+                  h(
+                    'li',
+                    { key: 'arg-' + index, className: 'bw-arg' },
+                    h(
+                      'div',
+                      { className: 'bw-arg__claim' },
+                      h('span', { className: 'bw-arg__badge' }, t('guideConclusion')),
+                      h(
+                        'button',
+                        {
+                          type: 'button',
+                          className: 'bw-arg__text',
+                          onClick: () => props.onJump(current.index, card.block),
+                          onMouseEnter: () => focusSource(card.block),
+                          onMouseLeave: () => focusSource(null),
+                          onFocus: () => focusSource(card.block),
+                          onBlur: () => focusSource(null),
+                        },
+                        card.text
+                      ),
+                      sourceQuote(card.block) ? h('span', { className: 'bw-gcard__quote' }, '「' + sourceQuote(card.block) + '」') : null,
+                      h('span', { className: 'bw-gcard__loc' }, t('guideOriginal') + ' · ' + t('structureLoc').replace('{chapter}', String(current.index + 1)).replace('{block}', String(card.block + 1)))
+                    ),
+                    card.evidence.length
+                      ? h(
+                          'div',
+                          { className: 'bw-arg__link', 'aria-hidden': 'true' },
+                          h('span', { className: 'bw-arg__arrow' }),
+                          h('span', { className: 'bw-arg__linklabel' }, t('guideBecause'))
+                        )
+                      : null,
+                    card.evidence.length
+                      ? h(
+                          'ul',
+                          { className: 'bw-arg__evidence', 'aria-label': t('structureEvidence') },
+                          card.evidence.map((evidence, evidenceIndex) =>
+                            h(
+                              'li',
+                              { key: 'ev-' + evidenceIndex },
+                              h(
+                                'button',
+                                {
+                                  type: 'button',
+                                  className: 'bw-arg__ev',
+                                  onClick: () => props.onJump(current.index, evidence.block),
+                                  onMouseEnter: () => focusSource(evidence.block),
+                                  onMouseLeave: () => focusSource(null),
+                                  onFocus: () => focusSource(evidence.block),
+                                  onBlur: () => focusSource(null),
+                                },
+                                h('span', { className: 'bw-arg__evbadge' }, relationLabel(evidence)),
+                                h('span', { className: 'bw-arg__evtext' }, evidence.text),
+                                sourceQuote(evidence.block) ? h('span', { className: 'bw-gcard__quote bw-gcard__quote--evidence' }, '「' + sourceQuote(evidence.block) + '」') : null
+                              )
+                            )
+                          )
+                        )
+                      : h('div', { className: 'bw-arg__noevidence' }, t('guideNoEvidence'))
+                  )
+                )
+              )
           : h('div', { className: 'bw-guide__hint' }, t('guideNoCards'))
       );
     }
@@ -4040,6 +4134,17 @@ window.__ModuleLoader__.load({
         guideNoCards: '本章暂无可导览卡片',
         guideCardClaim: '观点',
         guideCardBeat: '情节',
+        guideConclusion: '结论',
+        guideBecause: '因为',
+        guideNoEvidence: '这一观点未提取到论据',
+        guidePlotChain: '情节链',
+        relationReason: '因为',
+        relationExample: '例如',
+        relationData: '数据',
+        relationAuthority: '研究',
+        relationContrast: '反例',
+        relationDefinition: '定义',
+
         guideOriginal: '原文',
         guideSourceHint: '卡片里附原文摘要；悬停可在正文里高亮来源，点击定位并闪烁标出。',
         guideEmptyTitle: '暂无可导览的章节',
@@ -4196,6 +4301,17 @@ window.__ModuleLoader__.load({
         guideNoCards: 'No guide cards for this chapter yet',
         guideCardClaim: 'Claim',
         guideCardBeat: 'Plot',
+        guideConclusion: 'Claim',
+        guideBecause: 'Because',
+        guideNoEvidence: 'No evidence extracted for this claim',
+        guidePlotChain: 'Plot chain',
+        relationReason: 'Because',
+        relationExample: 'Example',
+        relationData: 'Data',
+        relationAuthority: 'Study',
+        relationContrast: 'Contrast',
+        relationDefinition: 'Definition',
+
         guideOriginal: 'Original',
         guideSourceHint: 'Cards include a source excerpt; hover to highlight it in the text, click to jump and flash.',
         guideEmptyTitle: 'Nothing to guide yet',

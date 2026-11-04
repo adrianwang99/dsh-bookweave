@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.9.0] - 2025-11-04
+
+- Guide claims are now rendered as **argument chains**: conclusion on top, an upward "because" arrow, then evidence cards tagged by relation (`reason` / `example` / `data` / `authority` / `contrast` / `definition`).
+- The Host prompt asks for an evidence relation and optional connector phrase; the client falls back to heuristics when a relation is missing.
+- Fiction beats render as a numbered **plot chain** with connecting nodes.
+
 ## [0.8.1] - 2025-11-04
 
 - The right rail now defaults to the **Guide** tab when a book is opened.
