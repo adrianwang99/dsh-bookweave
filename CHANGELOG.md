@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.10.0] - 2025-11-04
+
+- Book search is now configurable: Book list → **Search source** edits a URL template (`{query}` = title). Default is Open Library; no hardcoded third-party book site remains.
+- Reset-to-default and validation (http/https) included; the setting is stored in `localStorage` under `dsh-bookweave:search-template`.
+
 ## [0.9.0] - 2025-11-04
 
 - Guide claims are now rendered as **argument chains**: conclusion on top, an upward "because" arrow, then evidence cards tagged by relation (`reason` / `example` / `data` / `authority` / `contrast` / `definition`).

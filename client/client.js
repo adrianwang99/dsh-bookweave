@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.9.0';
+    const CLIENT_VERSION = '0.10.0';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -1378,8 +1378,27 @@ window.__ModuleLoader__.load({
         return lines.join('\n');
       }
 
+      const DEFAULT_SEARCH_TEMPLATE = 'https://openlibrary.org/search?q={query}';
+
+      function isValidSearchTemplate(template) {
+        const value = String(template || '').trim();
+        return /^https?:\/\//i.test(value) && value.length > 8;
+      }
+
+      /** 把书名填进用户配置的搜索地址模板；没有 {query} 时自动追加 q=。 */
+      function buildSearchUrl(title, template) {
+        const value = String(template || DEFAULT_SEARCH_TEMPLATE).trim();
+        const query = encodeURIComponent(String(title || '').trim());
+        if (!query) return value.split('{query}').join('');
+        if (value.indexOf('{query}') >= 0) return value.split('{query}').join(query);
+        return value + (value.indexOf('?') >= 0 ? '&' : '?') + 'q=' + query;
+      }
+
       return {
         version: 1,
+        DEFAULT_SEARCH_TEMPLATE,
+        isValidSearchTemplate,
+        buildSearchUrl,
         openZip,
         parseEpub,
         extractMentions,
@@ -1651,14 +1670,30 @@ window.__ModuleLoader__.load({
       return hash;
     }
 
-    const ZLIBRARY_HOME = 'https://z-library.sk/?ts=1216';
+    const SEARCH_TEMPLATE_KEY = 'dsh-bookweave:search-template';
 
-    /** Z-Library 只接受路径式搜索：/s/<query>。站点是跨域的，无法直接注入它的搜索框，
-        所以用它的搜索 URL 让书名直接成为查询词（保留用户的 ts 参数）。 */
-    function zLibrarySearchUrl(title) {
-      const query = encodeURIComponent(String(title || '').trim()).replace(/%20/g, '+');
-      if (!query) return ZLIBRARY_HOME;
-      return 'https://z-library.sk/s/' + query + '?ts=1216';
+    function readSearchTemplate() {
+      try {
+        const value = window.localStorage.getItem(SEARCH_TEMPLATE_KEY);
+        if (value && Core.isValidSearchTemplate(value)) return value;
+      } catch (error) {
+        /* localStorage 不可用时退回默认 */
+      }
+      return Core.DEFAULT_SEARCH_TEMPLATE;
+    }
+
+    function writeSearchTemplate(value) {
+      try {
+        if (!value) window.localStorage.removeItem(SEARCH_TEMPLATE_KEY);
+        else window.localStorage.setItem(SEARCH_TEMPLATE_KEY, value);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function searchUrlFor(title) {
+      return Core.buildSearchUrl(title, readSearchTemplate());
     }
 
     function toSummary(record) {
@@ -1808,6 +1843,13 @@ window.__ModuleLoader__.load({
       '.bw-toolbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}',
       '.bw-toolbar--search .bw-search{width:100%;flex:1 1 100%}',
       '.bw-toolbar--search{margin-bottom:6px}',
+      '.bw-searchcfg{border:1px solid var(--dsw-alias-border-l1);border-radius:9px;background:var(--dsw-alias-bg-base);padding:9px 10px;margin-bottom:8px;display:flex;flex-direction:column;gap:6px}',
+      '.bw-searchcfg__label{font-size:11px;color:var(--dsw-alias-label-secondary)}',
+      '.bw-searchcfg__input{width:100%;height:28px;font:inherit;font-size:11.5px;padding:0 8px;border-radius:7px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary)}',
+      '.bw-searchcfg__input:focus{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px}',
+      '.bw-searchcfg__hint{font-size:10.5px;color:var(--dsw-alias-label-secondary);line-height:1.5}',
+      '.bw-searchcfg__error{font-size:10.5px;color:var(--dsw-alias-state-error-primary)}',
+      '.bw-searchcfg__actions{display:flex;gap:6px}',
       '.bw-search{flex:1 1 110px;min-width:0;height:28px;font:inherit;font-size:12px;padding:0 9px;border-radius:7px;border:1px solid var(--dsw-alias-border-l2);',
       'background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary)}',
       '.bw-search:focus{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px}',
@@ -3156,7 +3198,7 @@ window.__ModuleLoader__.load({
       }
 
       function openSearch(title) {
-        setBrowserUrl(zLibrarySearchUrl(title));
+        setBrowserUrl(searchUrlFor(title));
       }
 
       async function analyzeChapter() {
@@ -3860,6 +3902,31 @@ window.__ModuleLoader__.load({
       const mentions = props.mentions;
       const [query, setQuery] = React.useState('');
       const [sort, setSort] = React.useState('count');
+      const [searchConfigOpen, setSearchConfigOpen] = React.useState(false);
+      const [templateDraft, setTemplateDraft] = React.useState(readSearchTemplate());
+      const [templateError, setTemplateError] = React.useState('');
+      function openSearchConfig() {
+        setTemplateDraft(readSearchTemplate());
+        setTemplateError('');
+        setSearchConfigOpen(true);
+      }
+      function saveSearchConfig() {
+        const value = templateDraft.trim();
+        if (!Core.isValidSearchTemplate(value)) {
+          setTemplateError(t('searchTemplateInvalid'));
+          return;
+        }
+        writeSearchTemplate(value);
+        setTemplateError('');
+        setSearchConfigOpen(false);
+        if (props.onNotify) props.onNotify(t('searchTemplateSaved'));
+      }
+      function resetSearchConfig() {
+        writeSearchTemplate('');
+        setTemplateDraft(Core.DEFAULT_SEARCH_TEMPLATE);
+        setTemplateError('');
+        if (props.onNotify) props.onNotify(t('searchTemplateSaved'));
+      }
       const filtered = React.useMemo(() => {
         const needle = query.trim().toLowerCase();
         const list = mentions.books.filter((item) => {
@@ -3898,8 +3965,36 @@ window.__ModuleLoader__.load({
           'div',
           { className: 'bw-toolbar bw-toolbar--sort' },
           h('button', { type: 'button', className: cx('bw-chip', sort === 'count' && 'bw-chip--on'), onClick: () => setSort('count') }, t('sortCount')),
-          h('button', { type: 'button', className: cx('bw-chip', sort === 'order' && 'bw-chip--on'), onClick: () => setSort('order') }, t('sortOrder'))
+          h('button', { type: 'button', className: cx('bw-chip', sort === 'order' && 'bw-chip--on'), onClick: () => setSort('order') }, t('sortOrder')),
+          h('button', { type: 'button', className: cx('bw-chip', searchConfigOpen && 'bw-chip--on'), onClick: openSearchConfig, 'aria-expanded': searchConfigOpen }, t('searchSource'))
         ),
+        searchConfigOpen
+          ? h(
+              'div',
+              { className: 'bw-searchcfg' },
+              h('div', { className: 'bw-searchcfg__label' }, t('searchTemplate')),
+              h('input', {
+                className: 'bw-searchcfg__input',
+                type: 'text',
+                value: templateDraft,
+                spellCheck: false,
+                placeholder: Core.DEFAULT_SEARCH_TEMPLATE,
+                'aria-label': t('searchTemplate'),
+                onChange: (event) => setTemplateDraft(event.target.value),
+                onKeyDown: (event) => {
+                  if (event.key === 'Enter') saveSearchConfig();
+                },
+              }),
+              h('div', { className: 'bw-searchcfg__hint' }, t('searchTemplateHint')),
+              templateError ? h('div', { className: 'bw-searchcfg__error' }, templateError) : null,
+              h(
+                'div',
+                { className: 'bw-searchcfg__actions' },
+                h('button', { type: 'button', className: 'bw-btn bw-btn--sm', onClick: saveSearchConfig }, t('searchTemplateApply')),
+                h('button', { type: 'button', className: 'bw-btn bw-btn--sm bw-btn--ghost', onClick: resetSearchConfig }, t('searchTemplateReset'))
+              )
+            )
+          : null,
         filtered.length
           ? h(
               'ul',
@@ -4092,7 +4187,7 @@ window.__ModuleLoader__.load({
         locate: '定位正文',
         copyTitle: '复制书名',
         searchBook: '搜索书籍',
-        searchBookHint: '在 Z-Library 搜索《{title}》',
+        searchBookHint: '搜索书籍《{title}》',
         coverUpdated: '封面已更新',
         importDone: '导入完成，识别到 {count} 本书',
         alreadyImported: '这本书已经在书架里了',
@@ -4109,6 +4204,14 @@ window.__ModuleLoader__.load({
         stageExtract: '正在扫描书名…',
         stageSave: '正在保存到本机…',
         cancel: '取消',
+        searchSource: '搜索源',
+        searchTemplate: '搜索地址模板',
+        searchTemplateHint: '用 {query} 代表书名，例如 https://openlibrary.org/search?q={query}；保存后「搜索书籍」会使用它。',
+        searchTemplateApply: '保存',
+        searchTemplateReset: '恢复默认',
+        searchTemplateInvalid: '地址必须以 http:// 或 https:// 开头',
+        searchTemplateSaved: '搜索源已更新',
+
         modeGroup: '阅读模式切换',
         modeReading: '阅读',
         modeStructure: '书籍结构',
@@ -4259,7 +4362,7 @@ window.__ModuleLoader__.load({
         locate: 'Jump to text',
         copyTitle: 'Copy title',
         searchBook: 'Search book',
-        searchBookHint: 'Search Z-Library for 《{title}》',
+        searchBookHint: 'Search for 《{title}》',
         coverUpdated: 'Cover updated',
         importDone: 'Imported: {count} books found',
         alreadyImported: 'This book is already on your shelf',
@@ -4276,6 +4379,14 @@ window.__ModuleLoader__.load({
         stageExtract: 'Scanning book titles…',
         stageSave: 'Saving locally…',
         cancel: 'Cancel',
+        searchSource: 'Search source',
+        searchTemplate: 'Search URL template',
+        searchTemplateHint: 'Use {query} for the book title, e.g. https://openlibrary.org/search?q={query}. Saved value is used by “Search book”.',
+        searchTemplateApply: 'Save',
+        searchTemplateReset: 'Reset to default',
+        searchTemplateInvalid: 'The URL must start with http:// or https://',
+        searchTemplateSaved: 'Search source updated',
+
         modeGroup: 'Reading mode',
         modeReading: 'Reading',
         modeStructure: 'Structure',

@@ -4,7 +4,7 @@
   <p><strong>Read EPUBs inside DSH, discover every book they cite, and let an AI guide you through the chapters.</strong></p>
   <p>
     <a href="https://github.com/adrianwang99/dsh-bookweave/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green" /></a>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.9.0-blue" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.10.0-blue" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-DSH%20Web-7c5cff" />
     <img alt="Tests" src="https://img.shields.io/badge/tests-node--only-success" />
   </p>
@@ -25,7 +25,7 @@ BookWeave is a [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-
 | **Excerpts** | Select text → red underline + excerpt card with an optional note; click an excerpt to jump back to the exact paragraph. |
 | **Book guide** | A right-rail tab, left of Excerpts: chapter picker, AI-generated chapter summary, and cards **ordered by where they appear in the text**. Claims render as an **argument chain**: the conclusion at the top, an up-arrow labelled “because”, then the reasons/examples/data beneath, each tagged with its relation. Every node shows an “original” excerpt and highlights/flashes the source paragraph on hover/click. |
 | **AI analysis** | One explicit button per chapter. Fiction → plot summary in the book's own voice + plot beats; nonfiction → claims + evidence. Input is compressed to ≤6–8k characters, output ≤700 tokens, lowest reasoning effort, cached per book/chapter, never re-billed unless you press “Analyze again”. |
-| **Book search** | From a book-list entry, open an in-plugin browser panel pre-filled with a book search URL, or open it externally. |
+| **Book search** | From a book-list entry, open an in-plugin browser panel pre-filled with a **configurable search URL** (default: Open Library). Edit the template under Book list → **Search source**; use `{query}` for the title, and any search provider works. |
 | **Export** | Export the whole book list as Markdown. |
 | **i18n** | Chinese and English UI. |
 
@@ -75,7 +75,7 @@ Restart DSH (⌘Q on macOS) after installing or updating the **Host** half (`ind
 4. Open the right rail → **Guide** (default). Pick a chapter, optionally press **Analyze chapter**.
 5. Hover a guide card to highlight the source paragraph in the text; click it to scroll and flash that paragraph.
 6. Select text in the reader to create an excerpt; open **Excerpts** to review and jump.
-7. Book list → expand an entry to locate the mention or search the book in the built-in browser.
+7. Book list → expand an entry to locate the mention or search the book in the built-in browser. The search URL is configurable (Book list → **Search source**, default Open Library).
 
 ## AI analysis & privacy
 

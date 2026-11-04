@@ -4,7 +4,7 @@
   <p><strong>在 DSH 左侧栏里读 EPUB，自动发现书里提到的每一本书，再用 AI 生成可点击的章节导览。</strong></p>
   <p>
     <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green" /></a>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.9.0-blue" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.10.0-blue" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-DSH%20Web-7c5cff" />
   </p>
   <p><a href="README.md">English</a> | 中文</p>
@@ -24,7 +24,7 @@
 | **摘录** | 划词 → 红色下划线 + 摘录卡片，可加笔记；点摘录跳回原文段落。 |
 | **书籍导览** | 右栏 tab（在「摘录」左边）：章节切换、AI 生成的本章总结、**按原文出现顺序**排列的导览卡片。观点会画成**论证链**：顶部是结论，中间一个向上的「因为」箭头，下面是原因/例子/数据等论据，每条都带关系标签；所有节点都附「原文」摘要，悬停高亮正文来源，点击定位并闪烁标出段落。 |
 | **AI 提炼** | 每章一个显式按钮。小说 → 用原文文风写情节概括 + 情节节点；论述类 → 观点 + 论据。输入压缩到 ≤6–8k 字，输出 ≤700 tokens，推理取最低档，结果按书+章缓存；只有点「重新提炼」才会再次消耗。 |
-| **书籍搜索** | 书单条目可打开插件内浏览器面板（已填好搜索地址），或外部打开。 |
+| **书籍搜索** | 书单条目可打开插件内浏览器面板（已填好搜索地址），或外部打开。搜索地址**可配置**（默认 Open Library），在书单 →「搜索源」里改模板，用 `{query}` 代表书名。 |
 | **导出** | 把整本书单导出为 Markdown。 |
 | **双语** | 中文 / English 界面。 |
 
@@ -73,7 +73,7 @@ ln -s "$(pwd)" ~/.dsh/profiles/desktop/node_modules/dsh-bookweave
 4. 打开右侧栏 → 默认是 **导览**。选章节，需要时点 **AI 提炼本章**。
 5. 悬停导览卡片 → 正文对应段落高亮；点击 → 滚动定位并闪烁标出。
 6. 在正文划词 → 生成摘录；在 **摘录** tab 里回看和跳转。
-7. 书单 → 展开条目可定位原文，或在插件内浏览器里搜索这本书。
+7. 书单 → 展开条目可定位原文，或在插件内浏览器里搜索这本书。搜索地址可配置（书单 →「搜索源」，默认 Open Library）。
 
 ## AI 与隐私
 

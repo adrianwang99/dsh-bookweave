@@ -29,6 +29,9 @@ jobs:
       - name: Structure suite
         run: node test/structure.mjs
 
+      - name: Search template suite
+        run: node test/search.mjs
+
       - name: Host AI suite
         run: node test/host.mjs
 
