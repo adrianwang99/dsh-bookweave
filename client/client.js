@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.15.0';
+    const CLIENT_VERSION = '0.15.1';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -1899,6 +1899,9 @@ window.__ModuleLoader__.load({
       '.bw-ecard__source{font-size:10.5px;color:var(--dsw-alias-label-secondary);font-style:italic;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}',
       '.bw-ecard__text{font-size:12.5px;line-height:1.7;color:var(--dsw-alias-label-primary);word-break:break-word;white-space:pre-wrap}',
       '.bw-ecard__note{font-size:11.5px;color:var(--dsw-alias-label-secondary);line-height:1.6;white-space:pre-wrap;border-left:2px solid var(--dsw-alias-border-l2);padding-left:7px}',
+      '.bw-ecard__btn--primary{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);border-radius:6px;padding:3px 9px;font-size:11px;font-weight:600}',
+      '.bw-ecard__btn--primary:hover{background:var(--dsw-alias-bg-layer-1);border-color:var(--dsw-alias-brand-primary);color:var(--dsw-alias-brand-primary)}',
+      '.bw-ecard__sourcelabel{font-style:normal;color:var(--dsw-alias-label-secondary);margin-right:4px;font-weight:600}',
       '.bw-ecard__actions{display:flex;gap:10px;flex-wrap:wrap;padding-top:2px}',
       '.bw-ecard__btn{font:inherit;font-size:11px;background:none;border:0;padding:0;color:var(--dsw-alias-label-secondary);cursor:pointer}',
       '.bw-ecard__btn:hover{color:var(--dsw-alias-label-primary)}',
@@ -2336,7 +2339,19 @@ window.__ModuleLoader__.load({
                   h('span', null, formatExcerptTime(item.createdAt))
                 )
               ),
-              isThought && item.sourceText ? h('div', { className: 'bw-ecard__source' }, '「' + item.sourceText + '」') : null,
+              isThought
+                ? (() => {
+                    const source = item.sourceText || (typeof props.getThoughtSource === 'function' ? props.getThoughtSource(item) : '');
+                    return source
+                      ? h(
+                          'div',
+                          { className: 'bw-ecard__source' },
+                          h('span', { className: 'bw-ecard__sourcelabel' }, t('guideOriginal')),
+                          '「' + source + '」'
+                        )
+                      : null;
+                  })()
+                : null,
               h(
                 'div',
                 { className: 'bw-ecard__text', style: isThought ? { color: item.color || '#7aa2ff' } : undefined },
@@ -2350,7 +2365,7 @@ window.__ModuleLoader__.load({
                   'button',
                   {
                     type: 'button',
-                    className: 'bw-ecard__btn',
+                    className: 'bw-ecard__btn bw-ecard__btn--primary',
                     onClick: (event) => {
                       event.stopPropagation();
                       if (isThought) props.onThoughtLocate(item);
@@ -3382,6 +3397,15 @@ window.__ModuleLoader__.load({
         if (props.onNotify) props.onNotify(t('thoughtSaved'));
       }
 
+      function thoughtSource(thought) {
+        if (!thought) return '';
+        if (thought.sourceText) return thought.sourceText;
+        const chapter = (chapters || []).find((item) => item.index === thought.chapterIndex);
+        if (!chapter) return '';
+        const block = (chapter.blocks || [])[thought.blockIndex];
+        return String((block && block.text) || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+      }
+
       function locateThought(thought) {
         if (!thought) return;
         setSelectedExcerptId(thought.id);
@@ -3803,6 +3827,7 @@ window.__ModuleLoader__.load({
                   onExcerptNote: updateExcerptNote,
                   onSearch: openSearch,
                   thoughts: thoughts,
+                  getThoughtSource: thoughtSource,
                   onThoughtLocate: locateThought,
                   onThoughtEdit: editThoughtFromPanel,
                   onThoughtDelete: deleteThought,
@@ -4274,6 +4299,7 @@ window.__ModuleLoader__.load({
                   onLocate: props.onExcerptLocate,
                   onDelete: props.onExcerptDelete,
                   onNote: props.onExcerptNote,
+                  getThoughtSource: props.getThoughtSource,
                   onThoughtLocate: props.onThoughtLocate,
                   onThoughtEdit: props.onThoughtEdit,
                   onThoughtDelete: props.onThoughtDelete,

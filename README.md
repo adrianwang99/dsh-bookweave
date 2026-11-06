@@ -4,7 +4,7 @@
   <p><strong>Read EPUBs inside DSH, discover every book they cite, and let an AI guide you through the chapters.</strong></p>
   <p>
     <a href="https://github.com/adrianwang99/dsh-bookweave/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green" /></a>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.15.0-blue" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.15.1-blue" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-DSH%20Web-7c5cff" />
     <img alt="Tests" src="https://img.shields.io/badge/tests-node--only-success" />
   </p>
@@ -22,7 +22,7 @@ BookWeave is a [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-
 | **Shelf** | Import `.epub` by click or drag & drop; 2:3 portrait covers extracted from the EPUB; book title, author and reading percentage only. |
 | **Reader** | Serif prose, adjustable font size, collapsible TOC, chapter navigation, remembered progress. No fixed header — the reading area and the right rail both start at the top of the window. |
 | **Book list** | Extracts every book the current book mentions: 《》 titles, English “quoted title” cues and a curated lexicon, with noise filters (self-references, TOC, chapter headings, periodicals). Each entry links back to the paragraph where it appears. |
-| **Excerpts & notes** | Select text → red underline + excerpt card with an optional note. Every entry (excerpt or note) renders as the same action card — badge, chapter/time, text, and always-visible Locate / Note (excerpts) / Edit (notes) / Delete. Adding a thought automatically lists its source passage here too; list text uses the system font (handwriting stays in the margin). |
+| **Excerpts & notes** | Select text → red underline + excerpt card with an optional note. Every entry (excerpt or note) renders as the same action card — badge, chapter/time, text, and always-visible Locate / Note (excerpts) / Edit (notes) / Delete. Adding a thought automatically lists its source passage here too (older notes fall back to the current paragraph text). Locate is a real button; list text uses the system font (handwriting stays in the margin). |
 | **Margin notes** | The reading column is narrower; the freed right margin shows your thoughts in a **handwriting font**, anchored to the paragraph (or selection) they belong to. Pick one of six ink colors per note; the referenced text gets a **dashed underline in the same color** while notes are shown. Add from the selection toolbar or the “+” in the margin. The floating toolbar toggles notes with an animated collapse — when hidden, a colored vertical bar marks every annotated paragraph and expands them again on click. |
 | **Book guide** | A right-rail tab, left of Excerpts: it opens on the chapter you are currently reading and follows TOC / prev-next / locate jumps. Chapter picker, AI-generated chapter summary, and cards **ordered by where they appear in the text**. Claims render as an **argument chain**: the conclusion at the top, an up-arrow labelled “because”, then the reasons/examples/data beneath, each tagged with its relation. Every node shows an “original” excerpt and highlights/flashes the source paragraph on hover/click. |
 | **AI analysis** | One explicit button per chapter. Fiction → plot summary in the book's own voice + plot beats; nonfiction → claims + evidence. Input is compressed to ≤6–8k characters, output ≤700 tokens, lowest reasoning effort, cached per book/chapter, never re-billed unless you press “Analyze again”. |

@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.15.1] - 2025-11-06
+
+- Thought cards always show the original passage: stored `sourceText` is used, and older notes fall back to the current paragraph text.
+- “Locate” in cards is now a real button; edit/delete stay as text actions.
+
 ## [0.15.0] - 2025-11-06
 
 - “Excerpts & notes” entries now all use one action-card design: badge, chapter/time, text, and always-visible Locate / Note / Edit / Delete buttons.
