@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.14.0] - 2025-11-06
+
+- Renamed the “Excerpts” tab to **Excerpts & notes**; it now merges manual excerpts and margin thoughts in reading order.
+- Adding a thought automatically records its source passage and lists it in that tab (badge distinguishes excerpt vs note); locate/edit/delete work for both.
+- Tab count and rail header count cover both kinds.
+
 ## [0.13.0] - 2025-11-06
 
 - Thoughts no longer repeat the quoted text inside the card; instead the referenced text in the body gets a **dashed underline in the thought's color** while notes are expanded.

@@ -8,7 +8,7 @@
     "zh": "在 DSH 左侧栏阅读 EPUB，自动生成全书引书书单与知识网络，并提供可点击溯源的 AI 章节导览。",
     "en": "Read EPUBs inside DSH, build a book list of every title the text mentions, and explore an AI chapter guide whose cards link back to the source paragraphs."
   },
-  "version": "0.13.0",
+  "version": "0.14.0",
   "author": {
     "name": "adrianwang99",
     "url": "https://github.com/adrianwang99"

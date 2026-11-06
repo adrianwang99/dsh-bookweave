@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.13.0';
+    const CLIENT_VERSION = '0.14.0';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -1897,6 +1897,7 @@ window.__ModuleLoader__.load({
       '.bw-item__head{display:flex;gap:7px;align-items:baseline;min-width:0}',
       '.bw-item__index{flex:none;font-size:10.5px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums;width:16px}',
       '.bw-item__main{min-width:0;flex:1}',
+      '.bw-item__source{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:10.5px;line-height:1.55;color:var(--dsw-alias-label-secondary);font-style:italic;margin-bottom:2px;word-break:break-word}',
       '.bw-item__title{font-size:12.5px;font-weight:600;line-height:1.5;color:var(--dsw-alias-label-primary);display:block;word-break:break-word}',
       '.bw-item__meta{display:flex;flex-wrap:wrap;gap:3px 7px;margin-top:2px;font-size:11px;color:var(--dsw-alias-label-secondary);line-height:1.55}',
       '.bw-count{flex:none;font-size:11px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
@@ -2094,6 +2095,7 @@ window.__ModuleLoader__.load({
       '.bw-thought-bar:hover::before{width:5px}',
       '@keyframes bw-bar-in{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}',
       '@keyframes bw-notes-in{from{opacity:0;transform:translateX(6px)}to{opacity:1;transform:none}}',
+      '.bw-thought-list-text{font-family:"Xingkai SC","Kaiti SC","STKaiti","KaiTi","Segoe Script",cursive;font-size:13px;line-height:1.65;white-space:pre-wrap}',
       '.bw-thought-underline{text-decoration-line:underline;text-decoration-style:dashed;text-decoration-thickness:1.5px;text-underline-offset:3px;text-decoration-skip-ink:none}',
       '.bw-thought__colors{display:flex;gap:6px;margin:1px 0 2px}',
       '.bw-thought__swatch{width:14px;height:14px;padding:0;border-radius:50%;border:2px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}',
@@ -2268,7 +2270,8 @@ window.__ModuleLoader__.load({
     function ExcerptsPanel(props) {
       const t = props.t;
       const excerpts = props.excerpts || [];
-      if (!excerpts.length) {
+      const thoughts = props.thoughts || [];
+      if (!excerpts.length && !thoughts.length) {
         return h(
           'div',
           { className: 'bw-empty' },
@@ -2276,15 +2279,32 @@ window.__ModuleLoader__.load({
           h('div', null, t('excerptEmptyText'))
         );
       }
+      const entries = [];
+      for (const item of excerpts) {
+        entries.push({ kind: 'excerpt', item: item, chapterIndex: item.chapterIndex, block: item.startBlock, createdAt: item.createdAt });
+      }
+      for (const item of thoughts) {
+        entries.push({
+          kind: 'thought',
+          item: item,
+          chapterIndex: item.chapterIndex,
+          block: item.startBlock == null ? item.blockIndex : item.startBlock,
+          createdAt: item.createdAt,
+        });
+      }
+      entries.sort((a, b) => a.chapterIndex - b.chapterIndex || a.block - b.block || a.createdAt - b.createdAt);
       return h(
         'div',
         null,
-        h('div', { className: 'bw-rail__meta' }, t('excerptMeta').replace('{count}', String(excerpts.length))),
+        h('div', { className: 'bw-rail__meta' }, t('excerptMeta').replace('{count}', String(entries.length))),
         h(
           'ul',
           { className: 'bw-list' },
-          excerpts.map((item, index) => {
+          entries.map((entry, index) => {
+            const item = entry.item;
             const selected = props.selectedId === item.id;
+            const isThought = entry.kind === 'thought';
+            const isExcerpt = entry.kind === 'excerpt';
             return h(
               'li',
               {
@@ -2309,13 +2329,19 @@ window.__ModuleLoader__.load({
                 h(
                   'div',
                   { className: 'bw-item__main' },
-                  h('span', { className: 'bw-item__title bw-excerpt__text' }, item.text),
+                  isThought && item.sourceText ? h('span', { className: 'bw-item__source' }, '「' + item.sourceText + '」') : null,
+                  h(
+                    'span',
+                    { className: cx('bw-item__title', isThought ? 'bw-thought-list-text' : 'bw-excerpt__text'), style: isThought ? { color: item.color || '#7aa2ff' } : undefined },
+                    item.text
+                  ),
                   h(
                     'span',
                     { className: 'bw-item__meta' },
-                    item.chapterTitle ? h('span', null, item.chapterTitle) : null,
+                    h('span', { className: 'bw-badge bw-badge--muted' }, isThought ? t('thoughtKind') : t('excerptKind')),
+                    h('span', null, item.chapterTitle || '第 ' + (item.chapterIndex + 1) + ' 章'),
                     h('span', null, formatExcerptTime(item.createdAt)),
-                    item.note ? h('span', null, t('excerptHasNote')) : null
+                    isExcerpt && item.note ? h('span', null, t('excerptHasNote')) : null
                   )
                 )
               ),
@@ -2323,25 +2349,57 @@ window.__ModuleLoader__.load({
                 ? h(
                     'div',
                     { className: 'bw-detail' },
-                    h('textarea', {
-                      className: 'bw-note',
-                      value: item.note || '',
-                      placeholder: t('excerptNotePlaceholder'),
-                      'aria-label': t('excerptNote'),
-                      onClick: (event) => event.stopPropagation(),
-                      onChange: (event) => props.onNote(item.id, event.target.value),
-                    }),
+                    isExcerpt
+                      ? h('textarea', {
+                          className: 'bw-note',
+                          value: item.note || '',
+                          placeholder: t('excerptNotePlaceholder'),
+                          'aria-label': t('excerptNote'),
+                          onClick: (event) => event.stopPropagation(),
+                          onChange: (event) => props.onNote(item.id, event.target.value),
+                        })
+                      : null,
                     h(
                       'div',
                       { className: 'bw-detail__actions' },
                       h(
                         'button',
-                        { type: 'button', className: 'bw-btn bw-btn--sm', onClick: (event) => { event.stopPropagation(); props.onLocate(item); } },
+                        {
+                          type: 'button',
+                          className: 'bw-btn bw-btn--sm',
+                          onClick: (event) => {
+                            event.stopPropagation();
+                            if (isThought) props.onThoughtLocate(item);
+                            else props.onLocate(item);
+                          },
+                        },
                         t('locate')
                       ),
+                      isThought
+                        ? h(
+                            'button',
+                            {
+                              type: 'button',
+                              className: 'bw-btn bw-btn--sm bw-btn--ghost',
+                              onClick: (event) => {
+                                event.stopPropagation();
+                                props.onThoughtEdit(item);
+                              },
+                            },
+                            t('thoughtEdit')
+                          )
+                        : null,
                       h(
                         'button',
-                        { type: 'button', className: 'bw-btn bw-btn--sm bw-btn--ghost', onClick: (event) => { event.stopPropagation(); props.onDelete(item.id); } },
+                        {
+                          type: 'button',
+                          className: 'bw-btn bw-btn--sm bw-btn--ghost',
+                          onClick: (event) => {
+                            event.stopPropagation();
+                            if (isThought) props.onThoughtDelete(item.id);
+                            else props.onDelete(item.id);
+                          },
+                        },
                         t('delete')
                       )
                     )
@@ -3236,6 +3294,8 @@ window.__ModuleLoader__.load({
       }
 
       function startThought(blockIndex) {
+        const block = (chapter.blocks || [])[blockIndex] || {};
+        const sourceText = String(block.text || '').replace(/\s+/g, ' ').trim().slice(0, 200);
         setThoughtDraft({
           id: '',
           chapterIndex: chapterIndex,
@@ -3244,6 +3304,8 @@ window.__ModuleLoader__.load({
           startOffset: null,
           endBlock: blockIndex,
           endOffset: null,
+          chapterTitle: chapter.title,
+          sourceText: sourceText,
           text: '',
           color: THOUGHT_COLORS[0],
         });
@@ -3259,6 +3321,8 @@ window.__ModuleLoader__.load({
           startOffset: pendingSelection.startOffset,
           endBlock: pendingSelection.endBlock,
           endOffset: pendingSelection.endOffset,
+          chapterTitle: chapter.title,
+          sourceText: String(pendingSelection.text || '').replace(/\s+/g, ' ').trim().slice(0, 200),
           text: '',
           color: THOUGHT_COLORS[0],
         });
@@ -3274,6 +3338,8 @@ window.__ModuleLoader__.load({
           startOffset: thought.startOffset,
           endBlock: thought.endBlock == null ? thought.blockIndex : thought.endBlock,
           endOffset: thought.endOffset,
+          chapterTitle: thought.chapterTitle || chapter.title,
+          sourceText: thought.sourceText || '',
           text: thought.text,
           color: thought.color || THOUGHT_COLORS[0],
         });
@@ -3297,6 +3363,8 @@ window.__ModuleLoader__.load({
             startOffset: thoughtDraft.startOffset == null ? null : thoughtDraft.startOffset,
             endBlock: thoughtDraft.endBlock == null ? thoughtDraft.blockIndex : thoughtDraft.endBlock,
             endOffset: thoughtDraft.endOffset == null ? null : thoughtDraft.endOffset,
+            chapterTitle: thoughtDraft.chapterTitle || chapter.title,
+            sourceText: thoughtDraft.sourceText || '',
             text: value,
             color: thoughtDraft.color || THOUGHT_COLORS[0],
             createdAt: Date.now(),
@@ -3305,6 +3373,20 @@ window.__ModuleLoader__.load({
         }
         setThoughtDraft(null);
         if (props.onNotify) props.onNotify(t('thoughtSaved'));
+      }
+
+      function locateThought(thought) {
+        if (!thought) return;
+        setSelectedExcerptId(thought.id);
+        jumpToBlock(thought.chapterIndex, thought.blockIndex);
+      }
+
+      function editThoughtFromPanel(thought) {
+        if (!thought) return;
+        if (!thoughtsOpen) toggleThoughts();
+        setSelectedExcerptId(thought.id);
+        jumpToBlock(thought.chapterIndex, thought.blockIndex);
+        editThought(thought);
       }
 
       function deleteThought(id) {
@@ -3713,6 +3795,10 @@ window.__ModuleLoader__.load({
                   onExcerptDelete: deleteExcerpt,
                   onExcerptNote: updateExcerptNote,
                   onSearch: openSearch,
+                  thoughts: thoughts,
+                  onThoughtLocate: locateThought,
+                  onThoughtEdit: editThoughtFromPanel,
+                  onThoughtDelete: deleteThought,
                   structure: structure,
                   structureChapter: structureChapter,
                   onSelectChapter: (index) => {
@@ -4105,7 +4191,7 @@ window.__ModuleLoader__.load({
       const mentions = props.mentions;
       const foundBooks = props.foundBooks;
       const articles = mentions.books.length - foundBooks.length;
-      const excerptCount = (props.excerpts || []).length;
+      const excerptCount = (props.excerpts || []).length + (props.thoughts || []).length;
       const structureTotals = (props.structure && props.structure.totals) || { chapters: 0, claims: 0, evidence: 0 };
       const head =
         props.tab === 'guide'
@@ -4175,11 +4261,15 @@ window.__ModuleLoader__.load({
               ? h(ExcerptsPanel, {
                   t: t,
                   excerpts: props.excerpts,
+                  thoughts: props.thoughts,
                   selectedId: props.selectedExcerptId,
                   onSelect: props.onExcerptSelect,
                   onLocate: props.onExcerptLocate,
                   onDelete: props.onExcerptDelete,
                   onNote: props.onExcerptNote,
+                  onThoughtLocate: props.onThoughtLocate,
+                  onThoughtEdit: props.onThoughtEdit,
+                  onThoughtDelete: props.onThoughtDelete,
                 })
               : h(BookList, {
                   t: t,
@@ -4579,17 +4669,19 @@ window.__ModuleLoader__.load({
         aiHeuristic: '结构线索（启发式）',
 
 
-        tabExcerpts: '摘录',
-        excerptsTitle: '摘录 · {count} 条',
-        excerptsMeta: '在正文里选中文字即可摘录',
-        excerptMeta: '共 {count} 条摘录',
-        excerptEmptyTitle: '还没有摘录',
-        excerptEmptyText: '在正文里选中一段文字，点「摘录」保存；之后可以补笔记。',
+        tabExcerpts: '摘录和想法',
+        excerptsTitle: '摘录和想法 · {count}',
+        excerptsMeta: '划词摘录、段旁想法都会出现在这里',
+        excerptMeta: '共 {count} 条摘录与想法',
+        excerptEmptyTitle: '还没有摘录或想法',
+        excerptEmptyText: '在正文里选中一段文字点「摘录」，或给某段加「想法」；它们都会自动出现在这里。',
         saveExcerpt: '摘录',
         excerptSaved: '已保存摘录',
         excerptNote: '笔记',
         excerptNotePlaceholder: '写点想法…',
         excerptHasNote: '有笔记',
+        excerptKind: '摘录',
+        thoughtKind: '想法',
         browserTitle: '内置浏览器',
         browserBack: '后退',
         browserForward: '前进',
@@ -4764,17 +4856,19 @@ window.__ModuleLoader__.load({
         aiHeuristic: 'Structural cues (heuristic)',
 
 
-        tabExcerpts: 'Excerpts',
-        excerptsTitle: 'Excerpts · {count}',
-        excerptsMeta: 'Select text in the book to save an excerpt',
-        excerptMeta: '{count} excerpts',
-        excerptEmptyTitle: 'No excerpts yet',
-        excerptEmptyText: 'Select a passage in the reader and tap “Excerpt”; you can add notes later.',
+        tabExcerpts: 'Excerpts & notes',
+        excerptsTitle: 'Excerpts & notes · {count}',
+        excerptsMeta: 'Excerpts and margin notes both appear here',
+        excerptMeta: '{count} excerpts & notes',
+        excerptEmptyTitle: 'No excerpts or notes yet',
+        excerptEmptyText: 'Select a passage and tap “Excerpt”, or add a margin note; both appear here automatically.',
         saveExcerpt: 'Excerpt',
         excerptSaved: 'Excerpt saved',
         excerptNote: 'Note',
         excerptNotePlaceholder: 'Add a note…',
         excerptHasNote: 'Has note',
+        excerptKind: 'Excerpt',
+        thoughtKind: 'Note',
         browserTitle: 'Built-in browser',
         browserBack: 'Back',
         browserForward: 'Forward',
