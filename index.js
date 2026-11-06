@@ -13,10 +13,24 @@
  */
 
 const ROUTE_PATH = '/api/dsh-bookweave/analyze';
+const TRANSLATE_ROUTE_PATH = '/api/dsh-bookweave/translate';
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_PROMPT_CHARS = 8000;
 const MAX_OUTPUT_TOKENS = 700;
 const REQUEST_TIMEOUT_MS = 90000;
+const MAX_TRANSLATE_CHARS = 8000;
+const MAX_TRANSLATE_TOKENS = 2400;
+
+const TARGET_LANGUAGES = {
+  zh: 'Simplified Chinese',
+  en: 'English',
+  ja: 'Japanese',
+  ko: 'Korean',
+  fr: 'French',
+  de: 'German',
+  es: 'Spanish',
+  ru: 'Russian',
+};
 
 const RELATIONS = new Set(['reason', 'example', 'data', 'authority', 'contrast', 'definition']);
 
@@ -340,6 +354,130 @@ function createHandler(ctx) {
   };
 }
 
+function buildTranslatePrompt(input) {
+  const target = TARGET_LANGUAGES[input.targetLang] || TARGET_LANGUAGES.en;
+  return [
+    '把下面按编号的原文翻译成' + target + '。',
+    '逐段翻译，编号一致，不合并段落；保留数字、注释编号和专有名词。',
+    '只输出 JSON：{"blocks":[{"i":0,"text":"译文"}]}',
+    '',
+    '原文：',
+    input.blocks.map((block) => '[#' + block.i + '] ' + block.text).join('\n'),
+  ].join('\n');
+}
+
+function normalizeTranslation(raw, allowed) {
+  if (!raw || !Array.isArray(raw.blocks)) return null;
+  const blocks = raw.blocks
+    .map((item) => {
+      const index = Number(item && item.i);
+      const text = clip(item && item.text, 2000);
+      if (!Number.isInteger(index) || !allowed.has(index) || !text) return null;
+      return { i: index, text };
+    })
+    .filter(Boolean);
+  if (!blocks.length) return null;
+  return { blocks };
+}
+
+function createTranslateHandler(ctx) {
+  return async function handler(req, res) {
+    try {
+      if (req.method !== 'POST') {
+        sendJson(res, 405, { error: 'method-not-allowed' });
+        return;
+      }
+      if (req.headers['x-dsh-bookweave'] !== '1') {
+        sendJson(res, 403, { error: 'forbidden' });
+        return;
+      }
+      let payload;
+      try {
+        payload = JSON.parse(await readBody(req, MAX_BODY_BYTES));
+      } catch (error) {
+        sendJson(res, 400, { error: 'bad-body' });
+        return;
+      }
+      const targetLang = TARGET_LANGUAGES[payload && payload.targetLang] ? payload.targetLang : 'en';
+      const blocks = [];
+      const allowed = new Set();
+      let totalChars = 0;
+      for (const item of Array.isArray(payload && payload.blocks) ? payload.blocks : []) {
+        const index = Number(item && item.i);
+        const text = typeof (item && item.text) === 'string' ? item.text : '';
+        if (!Number.isInteger(index) || !text.trim()) continue;
+        if (totalChars + text.length > MAX_TRANSLATE_CHARS) break;
+        blocks.push({ i: index, text });
+        allowed.add(index);
+        totalChars += text.length;
+      }
+      if (!blocks.length) {
+        sendJson(res, 400, { error: 'no-blocks' });
+        return;
+      }
+      const llm = ctx.get && ctx.get('llm');
+      if (!llm || typeof llm.stream !== 'function') {
+        sendJson(res, 503, { error: 'llm-unavailable' });
+        return;
+      }
+      const target = await resolveTarget(ctx, llm);
+      if (!target) {
+        sendJson(res, 503, { error: 'no-model' });
+        return;
+      }
+      const prompt = buildTranslatePrompt({ targetLang, blocks });
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+      let text = '';
+      let usage = null;
+      try {
+        const options = {
+          provider: target.provider,
+          model: target.model,
+          system: '你是专业书籍翻译。只输出严格 JSON，不要 Markdown 围栏，不要解释。',
+          messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
+          temperature: 0.2,
+          maxTokens: MAX_TRANSLATE_TOKENS,
+          signal: controller.signal,
+        };
+        if (target.reasoningEffort) options.reasoningEffort = target.reasoningEffort;
+        for await (const chunk of llm.stream(options)) {
+          if (!chunk) continue;
+          if (chunk.type === 'text-delta') text += chunk.text || '';
+          else if (chunk.type === 'usage') usage = chunk.usage;
+          else if (chunk.type === 'finish') {
+            const kind = chunk.reason && chunk.reason.kind;
+            if (kind === 'error' || kind === 'aborted') {
+              const code = chunk.reason && chunk.reason.failure && chunk.reason.failure.code;
+              throw new Error(kind === 'aborted' ? 'model-aborted' : 'model-failed:' + (code || 'error'));
+            }
+          }
+        }
+      } finally {
+        clearTimeout(timer);
+      }
+      const parsed = normalizeTranslation(parseJsonLoose(text), allowed);
+      if (!parsed) {
+        sendJson(res, 502, { error: 'bad-model-output', raw: clip(text, 400) });
+        return;
+      }
+      sendJson(res, 200, {
+        ok: true,
+        blocks: parsed.blocks,
+        targetLang,
+        provider: target.provider,
+        model: target.model,
+        usage,
+        inputChars: totalChars,
+      });
+    } catch (error) {
+      const message = String((error && error.message) || error || 'translate-failed');
+      const status = message === 'body-too-large' ? 413 : message === 'model-aborted' ? 504 : 500;
+      sendJson(res, status, { error: 'translate-failed', message });
+    }
+  };
+}
+
 export function apply(ctx) {
   if (!ctx || typeof ctx.inject !== 'function') return;
   ctx.inject(['webServer'], (scoped) => {
@@ -347,6 +485,10 @@ export function apply(ctx) {
     scoped.effect(
       () => scoped.webServer.register({ kind: 'exact', path: ROUTE_PATH, handler: createHandler(ctx) }),
       'dsh-bookweave: analyze route'
+    );
+    scoped.effect(
+      () => scoped.webServer.register({ kind: 'exact', path: TRANSLATE_ROUTE_PATH, handler: createTranslateHandler(ctx) }),
+      'dsh-bookweave: translate route'
     );
   });
 }
@@ -359,6 +501,10 @@ export const __test = {
   lowestEffort,
   createHandler,
   ROUTE_PATH,
+  TRANSLATE_ROUTE_PATH,
+  buildTranslatePrompt,
+  normalizeTranslation,
+  createTranslateHandler,
   MAX_PROMPT_CHARS,
   MAX_OUTPUT_TOKENS,
 };

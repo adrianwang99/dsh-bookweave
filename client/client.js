@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.15.1';
+    const CLIENT_VERSION = '0.16.0';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -1426,13 +1426,14 @@ window.__ModuleLoader__.load({
 
     // ---- 本机存储（IndexedDB：books 存正文，index 存书架摘要）--------------
     const DB_NAME = 'dsh-bookweave';
-    const DB_VERSION = 4;
+    const DB_VERSION = 5;
     let dbPromise = null;
     // IndexedDB 不可用时的会话内兜底：书签式存储失败仍然能读，只是刷新后需要重新导入。
     const memoryBooks = new Map();
     const memoryIndex = new Map();
     const memoryExcerpts = new Map();
     const memoryThoughts = new Map();
+    const memoryTranslations = new Map();
     const memoryInsights = new Map();
     let idbDown = false;
 
@@ -1468,6 +1469,7 @@ window.__ModuleLoader__.load({
           if (!db.objectStoreNames.contains('excerpts')) db.createObjectStore('excerpts', { keyPath: 'bookId' });
           if (!db.objectStoreNames.contains('insights')) db.createObjectStore('insights', { keyPath: 'key' });
           if (!db.objectStoreNames.contains('thoughts')) db.createObjectStore('thoughts', { keyPath: 'bookId' });
+          if (!db.objectStoreNames.contains('translations')) db.createObjectStore('translations', { keyPath: 'key' });
         };
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => {
@@ -1596,6 +1598,35 @@ window.__ModuleLoader__.load({
       }
     }
 
+    async function dbGetTranslation(key) {
+      const local = memoryTranslations.get(key);
+      if (idbDown) return local || null;
+      try {
+        const db = await openDatabase();
+        const tx = db.transaction('translations', 'readonly');
+        const record = await idbRequest(tx.objectStore('translations').get(key));
+        return record || local || null;
+      } catch (error) {
+        markIdbDown();
+        return local || null;
+      }
+    }
+
+    async function dbSaveTranslation(record) {
+      memoryTranslations.set(record.key, record);
+      if (idbDown) return false;
+      try {
+        const db = await openDatabase();
+        await runTransaction(db, 'translations', 'readwrite', (tx) => {
+          tx.objectStore('translations').put(record);
+        });
+        return true;
+      } catch (error) {
+        markIdbDown();
+        return false;
+      }
+    }
+
     async function dbGetThoughts(bookId) {
       const local = memoryThoughts.get(bookId);
       if (idbDown) return local || [];
@@ -1704,6 +1735,93 @@ window.__ModuleLoader__.load({
     const SEARCH_TEMPLATE_KEY = 'dsh-bookweave:search-template';
     const THOUGHTS_OPEN_KEY = 'dsh-bookweave:thoughts-open';
     const THOUGHT_COLORS = ['#7aa2ff', '#e5675f', '#5cc28a', '#e0b457', '#b18cff', '#9aa4b2'];
+    const TRANSLATE_LANG_KEY = 'dsh-bookweave:translate-lang';
+    const TRANSLATE_ON_KEY = 'dsh-bookweave:translate-on';
+    const TRANSLATE_LANGS = [
+      { id: 'zh', label: '中文' },
+      { id: 'en', label: 'English' },
+      { id: 'ja', label: '日本語' },
+      { id: 'ko', label: '한국어' },
+      { id: 'fr', label: 'Français' },
+      { id: 'de', label: 'Deutsch' },
+      { id: 'es', label: 'Español' },
+      { id: 'ru', label: 'Русский' },
+    ];
+
+    function defaultTranslateLang(record) {
+      try {
+        const chapter = record && record.chapters && record.chapters[0];
+        const sample = String((chapter && chapter.blocks || []).slice(0, 6).map((block) => block.text).join('')).slice(0, 4000);
+        const cjk = (sample.match(/[\u3400-\u9fff]/g) || []).length;
+        return sample.length && cjk / sample.length > 0.2 ? 'en' : 'zh';
+      } catch (error) {
+        return 'zh';
+      }
+    }
+
+    function readTranslateLang(record) {
+      try {
+        const value = window.localStorage.getItem(TRANSLATE_LANG_KEY);
+        if (value && TRANSLATE_LANGS.some((lang) => lang.id === value)) return value;
+      } catch (error) {
+        /* ignore */
+      }
+      return defaultTranslateLang(record);
+    }
+
+    function saveTranslateLang(value) {
+      try {
+        window.localStorage.setItem(TRANSLATE_LANG_KEY, value);
+      } catch (error) {
+        /* ignore */
+      }
+    }
+
+    function needsTranslation(text, targetLang) {
+      const value = String(text || '').trim();
+      if (value.length < 2) return false;
+      if (!/[A-Za-z\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af\u0400-\u04ff]/.test(value)) return false;
+      if (targetLang === 'zh') {
+        const cjk = (value.match(/[\u3400-\u9fff]/g) || []).length;
+        if (cjk / value.length > 0.55) return false;
+      }
+      if (targetLang === 'en') {
+        const latin = (value.match(/[A-Za-z]/g) || []).length;
+        if (latin / value.length > 0.7) return false;
+      }
+      return true;
+    }
+
+    async function runLimited(tasks, limit) {
+      const results = new Array(tasks.length);
+      let next = 0;
+      async function worker() {
+        while (next < tasks.length) {
+          const index = next++;
+          results[index] = await tasks[index]();
+        }
+      }
+      const workers = [];
+      for (let i = 0; i < Math.min(limit, tasks.length); i++) workers.push(worker());
+      await Promise.all(workers);
+      return results;
+    }
+
+    function readTranslateOn() {
+      try {
+        return window.localStorage.getItem(TRANSLATE_ON_KEY) === '1';
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function saveTranslateOn(value) {
+      try {
+        window.localStorage.setItem(TRANSLATE_ON_KEY, value ? '1' : '0');
+      } catch (error) {
+        /* ignore */
+      }
+    }
 
     function readSearchTemplate() {
       try {
@@ -2113,6 +2231,19 @@ window.__ModuleLoader__.load({
       '@keyframes bw-bar-in{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}',
       '@keyframes bw-notes-in{from{opacity:0;transform:translateX(6px)}to{opacity:1;transform:none}}',
       '.bw-thought-list-text{font-family:"Xingkai SC","Kaiti SC","STKaiti","KaiTi","Segoe Script",cursive;font-size:13px;line-height:1.65;white-space:pre-wrap}',
+      '.bw-float__btn--on{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-brand-primary);font-weight:650}',
+      '.bw-translate{position:relative;display:flex}',
+      '.bw-translate-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:60;width:210px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.22);padding:8px;display:flex;flex-direction:column;gap:6px}',
+      '.bw-translate-menu__head{font-size:10.5px;color:var(--dsw-alias-label-secondary)}',
+      '.bw-translate-menu__langs{display:flex;flex-wrap:wrap;gap:4px}',
+      '.bw-translate-menu__lang{font:inherit;font-size:11px;padding:3px 7px;border-radius:6px;border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer}',
+      '.bw-translate-menu__lang:hover{color:var(--dsw-alias-label-primary)}',
+      '.bw-translate-menu__lang--on{background:var(--dsw-alias-brand-primary);border-color:transparent;color:var(--dsw-alias-label-primary-foreground);font-weight:650}',
+      '.bw-translate-menu__off{font:inherit;font-size:11px;text-align:left;padding:4px 0;background:none;border:0;color:var(--dsw-alias-label-secondary);cursor:pointer}',
+      '.bw-translate-menu__off:hover{color:var(--dsw-alias-state-error-primary)}',
+      '.bw-translate-menu__status{font-size:10.5px;color:var(--dsw-alias-label-secondary)}',
+      '.bw-translate-menu__status--error{color:var(--dsw-alias-state-error-primary)}',
+      '.bw-translation{font-size:calc(12.5px * var(--bw-scale,1));line-height:1.85;color:var(--dsw-alias-label-secondary);margin-top:7px;padding-left:9px;border-left:2px solid var(--dsw-alias-border-l2);font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;white-space:pre-wrap;word-break:break-word}',
       '.bw-thought-underline{text-decoration-line:underline;text-decoration-style:dashed;text-decoration-thickness:1.5px;text-underline-offset:3px;text-decoration-skip-ink:none}',
       '.bw-thought__colors{display:flex;gap:6px;margin:1px 0 2px}',
       '.bw-thought__swatch{width:14px;height:14px;padding:0;border-radius:50%;border:2px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}',
@@ -3146,6 +3277,13 @@ window.__ModuleLoader__.load({
       const [excerpts, setExcerpts] = React.useState([]);
       const [thoughts, setThoughts] = React.useState([]);
       const [thoughtDraft, setThoughtDraft] = React.useState(null);
+      const [translateLang, setTranslateLang] = React.useState(() => readTranslateLang(record));
+      const [translateOn, setTranslateOn] = React.useState(() => readTranslateOn());
+      const [translations, setTranslations] = React.useState({});
+      const [translateStatus, setTranslateStatus] = React.useState('');
+      const [translateProgress, setTranslateProgress] = React.useState(null);
+      const [translateMenuOpen, setTranslateMenuOpen] = React.useState(false);
+      const translateTokenRef = React.useRef(0);
       const [thoughtsOpen, setThoughtsOpen] = React.useState(() => {
         try {
           const value = window.localStorage.getItem(THOUGHTS_OPEN_KEY);
@@ -3250,6 +3388,99 @@ window.__ModuleLoader__.load({
       React.useEffect(() => {
         setStructureChapter(chapterIndex);
       }, [chapterIndex]);
+
+      React.useEffect(() => {
+        setTranslations({});
+        setTranslateStatus('');
+        setTranslateProgress(null);
+        if (!translateOn) return undefined;
+        let alive = true;
+        const token = ++translateTokenRef.current;
+        const chapter = chapters[chapterIndex];
+        const rawBlocks = ((chapter && chapter.blocks) || []).map((block, index) => ({ i: index, text: String(block.text || '') }));
+        const translatable = rawBlocks.filter((item) => needsTranslation(item.text, translateLang));
+        if (!translatable.length) {
+          setTranslateStatus('done');
+          return undefined;
+        }
+        const byText = new Map();
+        for (const item of translatable) {
+          if (!byText.has(item.text)) byText.set(item.text, []);
+          byText.get(item.text).push(item.i);
+        }
+        const unique = Array.from(byText.keys()).map((text, index) => ({ i: index, text: text }));
+        const indexMap = new Map(unique.map((item, index) => [index, byText.get(item.text)]));
+        const signature = insightSignature(unique) + '-' + translateLang;
+        const key = record.id + '|' + chapterIndex + '|' + translateLang + '|' + signature;
+        dbGetTranslation(key)
+          .then(async (cached) => {
+            if (!alive || token !== translateTokenRef.current) return;
+            if (cached && cached.blocks && Object.keys(cached.blocks).length) {
+              setTranslations(cached.blocks);
+              setTranslateStatus('done');
+              return;
+            }
+            const batches = [];
+            let current = [];
+            let chars = 0;
+            for (const item of unique) {
+              if (chars + item.text.length > 2600 && current.length) {
+                batches.push(current);
+                current = [];
+                chars = 0;
+              }
+              current.push(item);
+              chars += item.text.length;
+            }
+            if (current.length) batches.push(current);
+            const visibleStart = blockOffset;
+            const visibleEnd = blockOffset + visibleBlocks.length - 1;
+            const visibleFirst = batches.slice().sort((a, b) => {
+              const aVisible = a.some((item) => item.i >= visibleStart && item.i <= visibleEnd) ? 0 : 1;
+              const bVisible = b.some((item) => item.i >= visibleStart && item.i <= visibleEnd) ? 0 : 1;
+              return aVisible - bVisible;
+            });
+            setTranslateStatus('loading');
+            setTranslateProgress({ done: 0, total: visibleFirst.length });
+            const merged = {};
+            let doneBatches = 0;
+            let model = '';
+            const tasks = visibleFirst.map((batch) => async () => {
+              const response = await fetch('/api/dsh-bookweave/translate', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json', 'x-dsh-bookweave': '1' },
+                body: JSON.stringify({ targetLang: translateLang, blocks: batch }),
+              });
+              const payload = await response.json().catch(() => null);
+              if (!response.ok || !payload || payload.ok !== true) throw new Error((payload && payload.error) || 'translate-failed');
+              model = payload.model || model;
+              doneBatches += 1;
+              for (const item of payload.blocks || []) {
+                const targets = indexMap.get(item.i) || [];
+                for (const target of targets) merged[target] = item.text;
+              }
+              if (alive && token === translateTokenRef.current) {
+                setTranslations(Object.assign({}, merged));
+                setTranslateProgress({ done: doneBatches, total: visibleFirst.length });
+              }
+              return true;
+            });
+            try {
+              await runLimited(tasks, 3);
+              if (!alive || token !== translateTokenRef.current) return;
+              setTranslateStatus('done');
+              dbSaveTranslation({ key, bookId: record.id, chapterIndex, lang: translateLang, signature, blocks: merged, model, createdAt: Date.now() }).catch(() => {});
+            } catch (error) {
+              if (alive && token === translateTokenRef.current) setTranslateStatus('error');
+            }
+          })
+          .catch(() => {
+            if (alive && token === translateTokenRef.current) setTranslateStatus('error');
+          });
+        return () => {
+          alive = false;
+        };
+      }, [translateOn, chapterIndex, translateLang, record.id]);
 
       React.useEffect(
         () => () => {
@@ -3684,6 +3915,73 @@ window.__ModuleLoader__.load({
                 h('button', { type: 'button', className: 'bw-float__btn', onClick: () => setShowRail((value) => !value), 'aria-pressed': showRail }, t('insights')),
                 h('button', { type: 'button', className: 'bw-float__btn', onClick: () => setScale((value) => Math.max(0.85, Math.round((value - 0.08) * 100) / 100)), 'aria-label': t('fontSmaller') }, 'A−'),
                 h('button', { type: 'button', className: 'bw-float__btn', onClick: () => setScale((value) => Math.min(1.4, Math.round((value + 0.08) * 100) / 100)), 'aria-label': t('fontLarger') }, 'A＋'),
+                h(
+                  'div',
+                  { className: 'bw-translate' },
+                  h(
+                    'button',
+                    {
+                      type: 'button',
+                      className: cx('bw-float__btn', translateOn && 'bw-float__btn--on'),
+                      onClick: () => setTranslateMenuOpen((value) => !value),
+                      'aria-expanded': translateMenuOpen,
+                    },
+                    t('translate')
+                  ),
+                  translateMenuOpen
+                    ? h(
+                        'div',
+                        { className: 'bw-translate-menu' },
+                        h('div', { className: 'bw-translate-menu__head' }, t('translateTarget')),
+                        h(
+                          'div',
+                          { className: 'bw-translate-menu__langs' },
+                          TRANSLATE_LANGS.map((lang) =>
+                            h(
+                              'button',
+                              {
+                                key: lang.id,
+                                type: 'button',
+                                className: cx('bw-translate-menu__lang', translateLang === lang.id && 'bw-translate-menu__lang--on'),
+                                onClick: () => {
+                                  setTranslateLang(lang.id);
+                                  saveTranslateLang(lang.id);
+                                  setTranslateOn(true);
+                                  saveTranslateOn(true);
+                                  setTranslateMenuOpen(false);
+                                },
+                              },
+                              lang.label
+                            )
+                          )
+                        ),
+                        translateOn
+                          ? h(
+                              'button',
+                              {
+                                type: 'button',
+                                className: 'bw-translate-menu__off',
+                                onClick: () => {
+                                  setTranslateOn(false);
+                                  saveTranslateOn(false);
+                                  setTranslateMenuOpen(false);
+                                },
+                              },
+                              t('translateOff')
+                            )
+                          : null,
+                        translateStatus === 'loading'
+                          ? h(
+                              'div',
+                              { className: 'bw-translate-menu__status' },
+                              t('translating') + (translateProgress ? ' ' + translateProgress.done + '/' + translateProgress.total : '')
+                            )
+                          : translateStatus === 'error'
+                            ? h('div', { className: 'bw-translate-menu__status bw-translate-menu__status--error' }, t('translateFailed'))
+                            : null
+                      )
+                    : null
+                ),
                 h('button', { type: 'button', className: 'bw-float__btn', onClick: toggleThoughts, 'aria-pressed': thoughtsOpen }, t(thoughtsOpen ? 'thoughtsCollapse' : 'thoughtsExpand'))
               ),
               h(
@@ -3774,7 +4072,8 @@ window.__ModuleLoader__.load({
                             setTab('excerpts');
                             setShowRail(true);
                           },
-                        })
+                        }),
+                        translations[blockIndex] ? h('div', { className: 'bw-translation' }, translations[blockIndex]) : null
                       ),
                       h(
                         'div',
@@ -4627,6 +4926,11 @@ window.__ModuleLoader__.load({
         stageExtract: '正在扫描书名…',
         stageSave: '正在保存到本机…',
         cancel: '取消',
+        translate: '翻译',
+        translateTarget: '译成',
+        translateOff: '关闭翻译',
+        translating: '翻译中…',
+        translateFailed: '翻译失败',
         thoughtsExpand: '展开想法',
         thoughtsCollapse: '折叠想法',
         thoughtColor: '想法颜色',
@@ -4814,6 +5118,11 @@ window.__ModuleLoader__.load({
         stageExtract: 'Scanning book titles…',
         stageSave: 'Saving locally…',
         cancel: 'Cancel',
+        translate: 'Translate',
+        translateTarget: 'Translate to',
+        translateOff: 'Turn off translation',
+        translating: 'Translating…',
+        translateFailed: 'Translation failed',
         thoughtsExpand: 'Show notes',
         thoughtsCollapse: 'Hide notes',
         thoughtColor: 'Note color',

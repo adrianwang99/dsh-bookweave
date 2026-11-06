@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.16.0] - 2025-11-06
+
+- Added chapter translation: floating Translate menu (8 target languages),译文 rendered under each paragraph, cached per book/chapter/language.
+- Speed/cost: skips short, numeric and already-target-language blocks; dedupes repeated paragraphs; batches ~2,600 chars with up to 3 parallel requests (visible paragraphs first); compact prompt; lowest reasoning effort; shared model/provider resolution.
+
 ## [0.15.1] - 2025-11-06
 
 - Thought cards always show the original passage: stored `sourceText` is used, and older notes fall back to the current paragraph text.

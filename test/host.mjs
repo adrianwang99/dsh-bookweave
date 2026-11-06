@@ -159,6 +159,26 @@ check('reasoning 取最低档', __test.lowestEffort({ reasoning: { efforts: [{ i
   check('没有 LLM 返回 503', res.statusCode === 503 && JSON.parse(res.body).error === 'llm-unavailable');
 }
 
+
+// 8. 翻译接口
+{
+  const translatePrompt = __test.buildTranslatePrompt({ targetLang: 'en', blocks: [{ i: 0, text: '你好' }] });
+  check('翻译 prompt 指定目标语言', translatePrompt.includes('English') && translatePrompt.includes('[#0]'), translatePrompt.slice(0, 120));
+  const normalized = __test.normalizeTranslation(
+    { blocks: [{ i: 0, text: 'Hello' }, { i: 9, text: '越界' }, { i: 0, text: '' }] },
+    new Set([0])
+  );
+  check('翻译结果只保留合法编号', normalized.blocks.length === 1 && normalized.blocks[0].text === 'Hello', JSON.stringify(normalized));
+  const translateLlm = makeLlm(JSON.stringify({ blocks: [{ i: 0, text: 'Hello' }] }));
+  const translateHandler = __test.createTranslateHandler(makeCtx(translateLlm));
+  const translateRes = await callHandler(translateHandler, { targetLang: 'en', blocks: [{ i: 0, text: '你好' }] });
+  const translatePayload = JSON.parse(translateRes.body);
+  check('翻译 handler 返回 200', translateRes.statusCode === 200, translateRes.body);
+  check('翻译输出可渲染', translatePayload.ok === true && translatePayload.blocks.length === 1 && translatePayload.blocks[0].text === 'Hello');
+  check('翻译 token 上限', translateLlm.calls[0].maxTokens === 2400);
+  check('翻译 prompt 使用目标语言', String(translateLlm.calls[0].messages[0].content[0].text).includes('English'));
+}
+
 if (failures) {
   console.log('\nFAIL ' + failures + ' host case(s)');
   process.exit(1);
