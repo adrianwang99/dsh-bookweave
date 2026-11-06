@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.18.2] - 2025-11-06
+
+- Selection toolbar buttons (thought / excerpt / cancel) are now icon-only, with the function name shown on hover (styled tooltip + native title).
+
 ## [0.18.1] - 2025-11-06
 
 - Folder import now also recognizes **extracted `.epub` folders** (a directory whose name ends with `.epub`, or a folder containing `META-INF/container.xml`): files are re-packed into an in-memory EPUB ZIP and parsed normally.

@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.18.1';
+    const CLIENT_VERSION = '0.18.2';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -2286,7 +2286,16 @@ window.__ModuleLoader__.load({
       '@container (max-width:980px){.bw-rail{position:absolute;right:0;top:0;bottom:0;width:min(92%,340px);z-index:6;box-shadow:-8px 0 22px rgba(0,0,0,.14)}}',
       '@container (max-width:900px){.bw-block{flex-wrap:wrap;gap:6px}.bw-block__text{flex:1 1 100%;max-width:none}.bw-block__margin{flex:1 1 100%;width:auto}.bw-thought-add{opacity:1}}',
       '@container (max-width:640px){.bw-main{padding:0 12px 12px}.bw-center__scroll{padding:18px 14px 32px}.bw-brand__sub{display:none}}',
-      '.bw-selbar{display:flex;gap:6px;padding:5px;border-radius:9px;background:var(--dsw-alias-bg-overlay);border:1px solid var(--dsw-alias-border-l2);box-shadow:0 6px 20px rgba(0,0,0,.18)}',
+      '.bw-selbar{display:flex;gap:4px;padding:4px;border-radius:10px;background:var(--dsw-alias-bg-overlay);border:1px solid var(--dsw-alias-border-l2);box-shadow:0 6px 20px rgba(0,0,0,.18)}',
+      '.bw-selbar__btn{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;padding:0;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-primary);cursor:pointer;transition:background .12s,color .12s}',
+      '.bw-selbar__btn:hover{background:var(--dsw-alias-bg-layer-2)}',
+      '.bw-selbar__btn--primary{background:var(--dsw-alias-brand-primary);color:var(--dsw-alias-label-primary-foreground)}',
+      '.bw-selbar__btn--primary:hover{filter:brightness(1.06)}',
+      '.bw-selbar__btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}',
+      '.bw-selbar__icon{width:17px;height:17px;display:block}',
+      '.bw-selbar__btn{position:relative}',
+      '.bw-selbar__btn::after{content:attr(data-tip);position:absolute;top:calc(100% + 7px);left:50%;transform:translateX(-50%);padding:3px 7px;border-radius:6px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);font-size:11px;line-height:1.4;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s;z-index:80}',
+      '.bw-selbar__btn:hover::after,.bw-selbar__btn:focus-visible::after{opacity:1}',
       '.bw-browser{position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;background:var(--dsw-alias-bg-base);padding:calc(12px + var(--dsh-frame-top-clearance,0px)) 16px 12px}',
       '.bw-browser__bar{flex:none;display:flex;align-items:center;gap:6px;padding-bottom:8px}',
       '.bw-browser__url{flex:1 1 auto;min-width:0;height:30px;font:inherit;font-size:12.5px;padding:0 10px;border-radius:8px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary)}',
@@ -4764,18 +4773,56 @@ window.__ModuleLoader__.load({
               },
               h(
                 'button',
-                { type: 'button', className: 'bw-btn bw-btn--sm bw-btn--ghost', onMouseDown: (event) => event.preventDefault(), onClick: startThoughtFromSelection },
-                t('thoughtAdd')
+                {
+                  type: 'button',
+                  className: 'bw-selbar__btn',
+                  title: t('thoughtAdd'),
+                  'data-tip': t('thoughtAdd'),
+                  'aria-label': t('thoughtAdd'),
+                  onMouseDown: (event) => event.preventDefault(),
+                  onClick: startThoughtFromSelection,
+                },
+                h(
+                  'svg',
+                  { className: 'bw-selbar__icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true', focusable: 'false' },
+                  h('path', { d: 'M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z' }),
+                  h('path', { d: 'M13.5 6.5l3 3' })
+                )
               ),
               h(
                 'button',
-                { type: 'button', className: 'bw-btn bw-btn--sm bw-btn--primary', onMouseDown: (event) => event.preventDefault(), onClick: saveSelectionAsExcerpt },
-                t('saveExcerpt')
+                {
+                  type: 'button',
+                  className: 'bw-selbar__btn bw-selbar__btn--primary',
+                  title: t('saveExcerpt'),
+                  'data-tip': t('saveExcerpt'),
+                  'aria-label': t('saveExcerpt'),
+                  onMouseDown: (event) => event.preventDefault(),
+                  onClick: saveSelectionAsExcerpt,
+                },
+                h(
+                  'svg',
+                  { className: 'bw-selbar__icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true', focusable: 'false' },
+                  h('path', { d: 'M7 4h10v16l-5-3.5L7 20z' })
+                )
               ),
               h(
                 'button',
-                { type: 'button', className: 'bw-btn bw-btn--sm bw-btn--ghost', onMouseDown: (event) => event.preventDefault(), onClick: clearSelection },
-                t('cancel')
+                {
+                  type: 'button',
+                  className: 'bw-selbar__btn',
+                  title: t('cancel'),
+                  'data-tip': t('cancel'),
+                  'aria-label': t('cancel'),
+                  onMouseDown: (event) => event.preventDefault(),
+                  onClick: clearSelection,
+                },
+                h(
+                  'svg',
+                  { className: 'bw-selbar__icon', viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true', focusable: 'false' },
+                  h('path', { d: 'M6 6l12 12' }),
+                  h('path', { d: 'M18 6L6 18' })
+                )
               )
             )
           : null
