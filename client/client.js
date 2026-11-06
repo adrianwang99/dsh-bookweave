@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.18.3';
+    const CLIENT_VERSION = '0.18.4';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -2459,7 +2459,8 @@ window.__ModuleLoader__.load({
       '.bw-prose--collapsed .bw-block__text{flex-basis:720px;max-width:720px}',
       '.bw-prose--collapsed .bw-block__margin{display:none}',
       '.bw-prose--collapsed .bw-masthead,.bw-prose--collapsed>h1{max-width:720px}',
-      '.bw-thought-bar{position:absolute;right:-16px;top:2px;bottom:2px;width:14px;border:0;padding:0;background:transparent;cursor:pointer;display:flex;justify-content:center;align-items:stretch;z-index:2;animation:bw-bar-in .3s ease}',
+      '.bw-block__body{position:relative}',
+      '.bw-thought-bar{position:absolute;right:-16px;top:0;bottom:0;width:14px;border:0;padding:0;background:transparent;cursor:pointer;display:flex;justify-content:center;align-items:stretch;z-index:2;animation:bw-bar-in .3s ease}',
       '.bw-thought-bar::before{content:"";width:3px;border-radius:2px;background:var(--bw-thought-color,#7aa2ff);transition:width .15s ease}',
       '.bw-thought-bar:hover::before{width:5px}',
       '@keyframes bw-bar-in{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}',
@@ -4669,21 +4670,35 @@ window.__ModuleLoader__.load({
                       h(
                         'div',
                         { className: 'bw-block__text' },
-                        h(ProseBlock, {
-                          block: block,
-                          blockIndex: blockIndex,
-                          chapterIndex: chapterIndex,
-                          excerpts: excerpts,
-                          thoughts: thoughts,
-                          thoughtsOpen: thoughtsOpen,
-                          highlight: highlight,
-                          onMention: onMention,
-                          onExcerpt: (id) => {
-                            setSelectedExcerptId(id);
-                            setTab('excerpts');
-                            setShowRail(true);
-                          },
-                        }),
+                        h(
+                          'div',
+                          { className: 'bw-block__body' },
+                          h(ProseBlock, {
+                            block: block,
+                            blockIndex: blockIndex,
+                            chapterIndex: chapterIndex,
+                            excerpts: excerpts,
+                            thoughts: thoughts,
+                            thoughtsOpen: thoughtsOpen,
+                            highlight: highlight,
+                            onMention: onMention,
+                            onExcerpt: (id) => {
+                              setSelectedExcerptId(id);
+                              setTab('excerpts');
+                              setShowRail(true);
+                            },
+                          }),
+                          !thoughtsOpen && blockThoughts.length
+                            ? h('button', {
+                                type: 'button',
+                                className: 'bw-thought-bar',
+                                style: { '--bw-thought-color': blockThoughts[blockThoughts.length - 1].color || THOUGHT_COLORS[0] },
+                                onClick: toggleThoughts,
+                                'aria-label': t('thoughtsExpand'),
+                                title: t('thoughtsExpand'),
+                              })
+                            : null
+                        ),
                         translations[blockIndex] ? h('div', { className: 'bw-translation' }, translations[blockIndex]) : null
                       ),
                       h(
@@ -4692,17 +4707,7 @@ window.__ModuleLoader__.load({
                         blockThoughts.map((thought) => (draftHere && draftHere.id === thought.id ? editor(draftHere) : card(thought))),
                         draftHere && !draftHere.id ? editor(draftHere) : null,
                         !draftHere ? h('button', { type: 'button', className: 'bw-thought-add', onClick: () => startThought(blockIndex) }, '+ ' + t('thoughtAdd')) : null
-                      ),
-                      !thoughtsOpen && blockThoughts.length
-                        ? h('button', {
-                            type: 'button',
-                            className: 'bw-thought-bar',
-                            style: { '--bw-thought-color': blockThoughts[blockThoughts.length - 1].color || THOUGHT_COLORS[0] },
-                            onClick: toggleThoughts,
-                            'aria-label': t('thoughtsExpand'),
-                            title: t('thoughtsExpand'),
-                          })
-                        : null
+                      )
                     );
                   })
                 )

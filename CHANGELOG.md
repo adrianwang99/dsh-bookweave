@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.18.4] - 2025-11-06
+
+- The collapsed thought marker bar is now anchored to the paragraph body, so its height matches the current paragraph instead of extending across paragraph margins (or translations).
+
 ## [0.18.3] - 2025-11-06
 
 - The guide chapter dropdown now mirrors the main TOC: no leading index numbers, chapter titles only, and the same per-chapter mention counts. The selector label also shows just the chapter title instead of “第 N 章 · …”.

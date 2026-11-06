@@ -4,7 +4,7 @@
   <p><strong>在 DSH 左侧栏里读 EPUB，自动发现书里提到的每一本书，再用 AI 生成可点击的章节导览。</strong></p>
   <p>
     <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green" /></a>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.18.3-blue" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.18.4-blue" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-DSH%20Web-7c5cff" />
   </p>
   <p><a href="README.md">English</a> | 中文</p>
