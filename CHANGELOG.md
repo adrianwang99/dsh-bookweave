@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.18.5] - 2025-11-06
+
+- When the margin-notes rail is collapsed, starting a thought (selection toolbar → 想法, or editing a note) now opens a floating composer over the page with the source snippet, textarea, color swatches, save and cancel; the hidden margin editor is no longer rendered.
+
 ## [0.18.4] - 2025-11-06
 
 - The collapsed thought marker bar is now anchored to the paragraph body, so its height matches the current paragraph instead of extending across paragraph margins (or translations).

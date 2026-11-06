@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.18.4';
+    const CLIENT_VERSION = '0.18.5';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -2480,6 +2480,11 @@ window.__ModuleLoader__.load({
       '.bw-translate-menu__status--error{color:var(--dsw-alias-state-error-primary)}',
       '.bw-translation{font-size:calc(12.5px * var(--bw-scale,1));line-height:1.85;color:var(--dsw-alias-label-secondary);margin-top:7px;padding-left:9px;border-left:2px solid var(--dsw-alias-border-l2);font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;white-space:pre-wrap;word-break:break-word}',
       '.bw-thought-underline{text-decoration-line:underline;text-decoration-style:dashed;text-decoration-thickness:1.5px;text-underline-offset:3px;text-decoration-skip-ink:none}',
+      '.bw-thought-pop{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.32)}',
+      '.bw-thought-pop__card{width:min(440px,92vw);max-height:80vh;overflow:auto;display:flex;flex-direction:column;gap:8px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:12px;box-shadow:0 18px 48px rgba(0,0,0,.35);padding:14px}',
+      '.bw-thought-pop__title{font-size:12.5px;font-weight:650;color:var(--dsw-alias-label-primary)}',
+      '.bw-thought-pop__source{font-size:11.5px;line-height:1.6;color:var(--dsw-alias-label-secondary);border-left:2px solid var(--dsw-alias-border-l2);padding-left:8px;max-height:3.4em;overflow:hidden}',
+      '.bw-thought-pop__input{min-height:96px;font-size:15px}',
       '.bw-thought__colors{display:flex;gap:6px;margin:1px 0 2px}',
       '.bw-thought__swatch{width:14px;height:14px;padding:0;border-radius:50%;border:2px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}',
       '.bw-thought__swatch--on{border-color:var(--dsw-alias-label-primary)}',
@@ -4704,9 +4709,9 @@ window.__ModuleLoader__.load({
                       h(
                         'div',
                         { className: 'bw-block__margin' },
-                        blockThoughts.map((thought) => (draftHere && draftHere.id === thought.id ? editor(draftHere) : card(thought))),
-                        draftHere && !draftHere.id ? editor(draftHere) : null,
-                        !draftHere ? h('button', { type: 'button', className: 'bw-thought-add', onClick: () => startThought(blockIndex) }, '+ ' + t('thoughtAdd')) : null
+                        thoughtsOpen ? blockThoughts.map((thought) => (draftHere && draftHere.id === thought.id ? editor(draftHere) : card(thought))) : null,
+                        thoughtsOpen && draftHere && !draftHere.id ? editor(draftHere) : null,
+                        thoughtsOpen && !draftHere ? h('button', { type: 'button', className: 'bw-thought-add', onClick: () => startThought(blockIndex) }, '+ ' + t('thoughtAdd')) : null
                       )
                     );
                   })
@@ -4764,6 +4769,64 @@ window.__ModuleLoader__.load({
           )
         ),
         browserUrl ? h(BrowserPanel, { t: t, initialUrl: browserUrl, onClose: () => setBrowserUrl('') }) : null,
+        thoughtDraft && !thoughtsOpen
+          ? h(
+              'div',
+              {
+                className: 'bw-thought-pop',
+                role: 'dialog',
+                'aria-modal': 'true',
+                'aria-label': t('thoughtAdd'),
+                onMouseDown: (event) => {
+                  if (event.target === event.currentTarget) setThoughtDraft(null);
+                },
+                onKeyDown: (event) => {
+                  if (event.key === 'Escape') setThoughtDraft(null);
+                },
+              },
+              h(
+                'div',
+                { className: 'bw-thought-pop__card' },
+                h('div', { className: 'bw-thought-pop__title' }, t('thoughtAdd')),
+                thoughtDraft.sourceText
+                  ? h('div', { className: 'bw-thought-pop__source' }, '「' + thoughtDraft.sourceText + '」')
+                  : null,
+                h('textarea', {
+                  className: 'bw-thought__input bw-thought-pop__input',
+                  value: thoughtDraft.text,
+                  rows: 4,
+                  autoFocus: true,
+                  placeholder: t('thoughtPlaceholder'),
+                  style: { color: thoughtDraft.color || THOUGHT_COLORS[0] },
+                  onChange: (event) => setThoughtDraft(Object.assign({}, thoughtDraft, { text: event.target.value })),
+                  onKeyDown: (event) => {
+                    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) saveThought();
+                    if (event.key === 'Escape') setThoughtDraft(null);
+                  },
+                }),
+                h(
+                  'div',
+                  { className: 'bw-thought__colors' },
+                  THOUGHT_COLORS.map((color) =>
+                    h('button', {
+                      key: color,
+                      type: 'button',
+                      className: cx('bw-thought__swatch', (thoughtDraft.color || THOUGHT_COLORS[0]) === color && 'bw-thought__swatch--on'),
+                      style: { background: color },
+                      'aria-label': t('thoughtColor') + ' ' + color,
+                      onClick: () => setThoughtDraft(Object.assign({}, thoughtDraft, { color: color })),
+                    })
+                  )
+                ),
+                h(
+                  'div',
+                  { className: 'bw-thought__ops bw-thought__ops--on' },
+                  h('button', { type: 'button', className: 'bw-thought__op bw-thought__op--primary', onClick: saveThought }, t('thoughtSave')),
+                  h('button', { type: 'button', className: 'bw-thought__op', onClick: () => setThoughtDraft(null) }, t('thoughtCancel'))
+                )
+              )
+            )
+          : null,
         pendingSelection
           ? h(
               'div',
