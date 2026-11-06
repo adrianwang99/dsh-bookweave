@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.19.0] - 2025-11-06
+
+- Translation is now part of the book: translated paragraphs persist in the book record (`translations`) and are rendered under each source paragraph as body text, surviving reopens and restarts.
+- New translation panel: target-language **dropdown**, **Start translation** and **Stop translation** buttons, progress bar and “translated X/Y paragraphs” count.
+- Nothing is translated automatically any more — the user must start it; stopping keeps already-finished paragraphs.
+- Whole-book translation runs chapter by chapter with the same batching/dedupe/skip logic; progress is persisted per chapter.
+
 ## [0.18.7] - 2025-11-06
 
 - Fixed notes written on a translation: selections inside the translated paragraph are now offset against the translation text and stored with `target: 'translation'`, so expanding the notes rail underlines the translated text instead of losing the range on the original paragraph.

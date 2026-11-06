@@ -4,7 +4,7 @@
   <p><strong>Read EPUBs inside DSH, discover every book they cite, and let an AI guide you through the chapters.</strong></p>
   <p>
     <a href="https://github.com/adrianwang99/dsh-bookweave/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green" /></a>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.18.7-blue" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.19.0-blue" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-DSH%20Web-7c5cff" />
     <img alt="Tests" src="https://img.shields.io/badge/tests-node--only-success" />
   </p>
@@ -27,7 +27,7 @@ BookWeave is a [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-
 | **Margin notes** | The reading column is narrower; the freed right margin shows your thoughts in a **handwriting font**, anchored to the paragraph (or selection) they belong to. Pick one of six ink colors per note; the referenced text gets a **dashed underline in the same color** while notes are shown. Add from the selection toolbar or the “+” in the margin. The floating toolbar toggles notes with an animated collapse — when hidden, a colored vertical bar marks every annotated paragraph and expands them again on click. |
 | **Book guide** | A right-rail tab, left of Excerpts: it opens on the chapter you are currently reading and follows TOC / prev-next / locate jumps. Chapter picker, AI-generated chapter summary, and cards **ordered by where they appear in the text**. Claims render as an **argument chain**: the conclusion at the top, an up-arrow labelled “because”, then the reasons/examples/data beneath, each tagged with its relation. Every node shows an “original” excerpt and highlights/flashes the source paragraph on hover/click. |
 | **AI analysis** | One explicit button per chapter. Fiction → plot summary in the book's own voice + plot beats; nonfiction → claims + evidence. Input is compressed to ≤6–8k characters, output ≤700 tokens, lowest reasoning effort, cached per book/chapter, never re-billed unless you press “Analyze again”. |
-| **Translation** | Floating “Translate” menu with 8 target languages; the translation appears **under each source paragraph**. Built for speed and cost: skips short/numeric/already-target-language blocks, dedupes repeated paragraphs, batches ~2.6k chars with up to 3 parallel requests (visible paragraphs first), uses the lowest reasoning effort, and caches per book/chapter/language/content fingerprint. |
+| **Translation** | Open the **Translate** panel, pick a target language from the dropdown, then click **Start** (nothing is translated automatically). The translation is written into the book and rendered **under each source paragraph as body text**, so it survives reopening; **Stop** halts the run and keeps finished paragraphs. A progress bar/count is shown. Batching, dedupe and skipping already-translated or already-target-language blocks keep it fast and frugal. |
 | **Book search** | From a book-list entry, open an in-plugin browser panel pre-filled with a **configurable search URL** (default: Open Library). Edit the template under Book list → **Search source**; use `{query}` for the title, and any search provider works. |
 | **Export** | Export the whole book list as Markdown. |
 | **i18n** | Chinese and English UI. |
@@ -84,7 +84,7 @@ Restart DSH (⌘Q on macOS) after installing or updating the **Host** half (`ind
 4. Open the right rail → **Guide** (default). Pick a chapter, optionally press **Analyze chapter**.
 5. Hover a guide card to highlight the source paragraph in the text; click it to scroll and flash that paragraph.
 6. Select text to create an excerpt (**Excerpts & notes** tab) or a thought (handwriting margin note); thoughts also appear in that tab with their source passage, and persist per book/chapter/paragraph.
-8. Translate: floating **Translate** → pick a language; translations render under paragraphs and are cached. Turn it off from the same menu.
+8. Translate: floating **Translate** → choose the target language → **Start translation**; progress is shown and finished paragraphs are saved into the book. **Stop translation** halts further work; translated text stays under the source paragraph and is still there after reopening the book.
 9. Book list → expand an entry to locate the mention or search the book in the built-in browser. The search URL is configurable (Book list → **Search source**, default Open Library).
 
 > **TOC note** — chapters are now built from the EPUB's NCX/nav TOC boundaries, not from every spine file. Books imported **before v0.17** keep the structure parsed at import time; delete and re-import them once to pick up the corrected TOC.
