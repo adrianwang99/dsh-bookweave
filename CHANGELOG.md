@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.13.0] - 2025-11-06
+
+- Thoughts no longer repeat the quoted text inside the card; instead the referenced text in the body gets a **dashed underline in the thought's color** while notes are expanded.
+- Selection-created thoughts underline exactly the selected range (across paragraphs when needed); margin-created thoughts underline the whole paragraph.
+- Underlines hide together with the margin when notes are collapsed; the colored margin bar still expands them.
+
 ## [0.12.1] - 2025-11-06
 
 - Collapsed notes no longer reserve layout height (the hidden margin is removed from flow), so the colored marker bar matches its paragraph instead of stretching across an empty gap.

@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.12.1';
+    const CLIENT_VERSION = '0.13.0';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -2094,6 +2094,7 @@ window.__ModuleLoader__.load({
       '.bw-thought-bar:hover::before{width:5px}',
       '@keyframes bw-bar-in{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}',
       '@keyframes bw-notes-in{from{opacity:0;transform:translateX(6px)}to{opacity:1;transform:none}}',
+      '.bw-thought-underline{text-decoration-line:underline;text-decoration-style:dashed;text-decoration-thickness:1.5px;text-underline-offset:3px;text-decoration-skip-ink:none}',
       '.bw-thought__colors{display:flex;gap:6px;margin:1px 0 2px}',
       '.bw-thought__swatch{width:14px;height:14px;padding:0;border-radius:50%;border:2px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}',
       '.bw-thought__swatch--on{border-color:var(--dsw-alias-label-primary)}',
@@ -2376,6 +2377,22 @@ window.__ModuleLoader__.load({
       }
     }
 
+    function thoughtRangesForBlock(thoughts, chapterIndex, blockIndex, textLength) {
+      const ranges = [];
+      for (const item of thoughts || []) {
+        if (!item || item.chapterIndex !== chapterIndex) continue;
+        const startBlock = item.startBlock == null ? item.blockIndex : item.startBlock;
+        const endBlock = item.endBlock == null ? startBlock : item.endBlock;
+        if (blockIndex < startBlock || blockIndex > endBlock) continue;
+        let start = blockIndex === startBlock && Number.isFinite(item.startOffset) ? item.startOffset : 0;
+        let end = blockIndex === endBlock && Number.isFinite(item.endOffset) ? item.endOffset : textLength;
+        start = Math.max(0, Math.min(textLength, start));
+        end = Math.max(start, Math.min(textLength, end));
+        if (end > start) ranges.push({ start: start, end: end, color: item.color || '#7aa2ff', id: item.id });
+      }
+      return ranges;
+    }
+
     function excerptRangesForBlock(excerpts, chapterIndex, blockIndex, textLength) {
       const ranges = [];
       for (const item of excerpts || []) {
@@ -2388,7 +2405,7 @@ window.__ModuleLoader__.load({
       return ranges;
     }
 
-    function renderBlockContent(text, highlight, excerptRanges, onMention, onExcerpt) {
+    function renderBlockContent(text, highlight, excerptRanges, thoughtRanges, onMention, onExcerpt) {
       const bookHits = [];
       if (highlight) {
         highlight.lastIndex = 0;
@@ -2398,47 +2415,61 @@ window.__ModuleLoader__.load({
           bookHits.push({ start: match.index, end: match.index + match[0].length, title: match[0] });
         }
       }
-      const ranges = [];
-      for (const range of excerptRanges) ranges.push({ start: range.start, end: range.end, kind: 'excerpt', id: range.id });
+      const thoughts = thoughtRanges || [];
+      const points = new Set([0, text.length]);
+      for (const range of excerptRanges) {
+        points.add(range.start);
+        points.add(range.end);
+      }
+      for (const range of thoughts) {
+        points.add(range.start);
+        points.add(range.end);
+      }
       for (const hit of bookHits) {
         const inside = excerptRanges.some((range) => hit.start >= range.start && hit.end <= range.end);
-        if (!inside) ranges.push({ start: hit.start, end: hit.end, kind: 'book', title: hit.title });
-      }
-      ranges.sort((a, b) => a.start - b.start || a.end - b.end);
-      const nodes = [];
-      let cursor = 0;
-      let key = 0;
-      for (const range of ranges) {
-        if (range.start < cursor) continue;
-        if (range.start > cursor) nodes.push(text.slice(cursor, range.start));
-        const slice = text.slice(range.start, range.end);
-        if (range.kind === 'excerpt') {
-          nodes.push(
-            h(
-              'mark',
-              {
-                key: 'x' + key++,
-                className: 'bw-excerpt-mark',
-                role: 'button',
-                tabIndex: 0,
-                title: slice,
-                onClick: () => onExcerpt(range.id),
-                onKeyDown: (event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    onExcerpt(range.id);
-                  }
-                },
-              },
-              slice
-            )
-          );
-        } else {
-          nodes.push(h('button', { key: 'b' + key++, type: 'button', className: 'bw-hit', onClick: () => onMention(range.title), title: range.title }, slice));
+        if (!inside) {
+          points.add(hit.start);
+          points.add(hit.end);
         }
-        cursor = range.end;
       }
-      if (cursor < text.length) nodes.push(text.slice(cursor));
+      const sorted = Array.from(points)
+        .filter((value) => value >= 0 && value <= text.length)
+        .sort((a, b) => a - b);
+      const nodes = [];
+      let key = 0;
+      for (let index = 0; index < sorted.length - 1; index++) {
+        const start = sorted[index];
+        const end = sorted[index + 1];
+        if (end <= start) continue;
+        const slice = text.slice(start, end);
+        const excerpt = excerptRanges.find((range) => start >= range.start && end <= range.end);
+        const thought = thoughts.find((range) => start >= range.start && end <= range.end);
+        const hit = excerpt ? null : bookHits.find((item) => start >= item.start && end <= item.end);
+        let node = slice;
+        if (thought) node = h('span', { key: 't' + key++, className: 'bw-thought-underline', style: { textDecorationColor: thought.color } }, node);
+        if (hit) node = h('button', { key: 'b' + key++, type: 'button', className: 'bw-hit', onClick: () => onMention(hit.title), title: hit.title }, node);
+        if (excerpt) {
+          node = h(
+            'mark',
+            {
+              key: 'x' + key++,
+              className: 'bw-excerpt-mark',
+              role: 'button',
+              tabIndex: 0,
+              title: slice,
+              onClick: () => onExcerpt(excerpt.id),
+              onKeyDown: (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onExcerpt(excerpt.id);
+                }
+              },
+            },
+            node
+          );
+        }
+        nodes.push(node);
+      }
       return nodes;
     }
 
@@ -3204,18 +3235,48 @@ window.__ModuleLoader__.load({
         });
       }
 
-      function startThought(blockIndex, quote) {
-        setThoughtDraft({ id: '', chapterIndex: chapterIndex, blockIndex: blockIndex, text: '', quote: quote || '', color: THOUGHT_COLORS[0] });
+      function startThought(blockIndex) {
+        setThoughtDraft({
+          id: '',
+          chapterIndex: chapterIndex,
+          blockIndex: blockIndex,
+          startBlock: blockIndex,
+          startOffset: null,
+          endBlock: blockIndex,
+          endOffset: null,
+          text: '',
+          color: THOUGHT_COLORS[0],
+        });
       }
 
       function startThoughtFromSelection() {
         if (!pendingSelection) return;
-        startThought(pendingSelection.startBlock, pendingSelection.text.slice(0, 180));
+        setThoughtDraft({
+          id: '',
+          chapterIndex: pendingSelection.chapterIndex,
+          blockIndex: pendingSelection.startBlock,
+          startBlock: pendingSelection.startBlock,
+          startOffset: pendingSelection.startOffset,
+          endBlock: pendingSelection.endBlock,
+          endOffset: pendingSelection.endOffset,
+          text: '',
+          color: THOUGHT_COLORS[0],
+        });
         clearSelection();
       }
 
       function editThought(thought) {
-        setThoughtDraft({ id: thought.id, chapterIndex: thought.chapterIndex, blockIndex: thought.blockIndex, text: thought.text, quote: thought.quote || '', color: thought.color || THOUGHT_COLORS[0] });
+        setThoughtDraft({
+          id: thought.id,
+          chapterIndex: thought.chapterIndex,
+          blockIndex: thought.blockIndex,
+          startBlock: thought.startBlock == null ? thought.blockIndex : thought.startBlock,
+          startOffset: thought.startOffset,
+          endBlock: thought.endBlock == null ? thought.blockIndex : thought.endBlock,
+          endOffset: thought.endOffset,
+          text: thought.text,
+          color: thought.color || THOUGHT_COLORS[0],
+        });
       }
 
       function saveThought() {
@@ -3232,7 +3293,10 @@ window.__ModuleLoader__.load({
             id: 'th-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
             chapterIndex: thoughtDraft.chapterIndex,
             blockIndex: thoughtDraft.blockIndex,
-            quote: thoughtDraft.quote || '',
+            startBlock: thoughtDraft.startBlock == null ? thoughtDraft.blockIndex : thoughtDraft.startBlock,
+            startOffset: thoughtDraft.startOffset == null ? null : thoughtDraft.startOffset,
+            endBlock: thoughtDraft.endBlock == null ? thoughtDraft.blockIndex : thoughtDraft.endBlock,
+            endOffset: thoughtDraft.endOffset == null ? null : thoughtDraft.endOffset,
             text: value,
             color: thoughtDraft.color || THOUGHT_COLORS[0],
             createdAt: Date.now(),
@@ -3532,7 +3596,6 @@ window.__ModuleLoader__.load({
                       h(
                         'div',
                         { key: 'draft', className: 'bw-thought bw-thought--edit' },
-                        draft.quote ? h('div', { className: 'bw-thought__quote' }, '「' + draft.quote + '」') : null,
                         h('textarea', {
                           className: 'bw-thought__input',
                           value: draft.text,
@@ -3570,7 +3633,6 @@ window.__ModuleLoader__.load({
                       h(
                         'div',
                         { key: thought.id, className: 'bw-thought' },
-                        thought.quote ? h('div', { className: 'bw-thought__quote' }, '「' + thought.quote + '」') : null,
                         h('div', { className: 'bw-thought__text', style: { color: thought.color || THOUGHT_COLORS[0] } }, thought.text),
                         h(
                           'div',
@@ -3590,6 +3652,8 @@ window.__ModuleLoader__.load({
                           blockIndex: blockIndex,
                           chapterIndex: chapterIndex,
                           excerpts: excerpts,
+                          thoughts: thoughts,
+                          thoughtsOpen: thoughtsOpen,
                           highlight: highlight,
                           onMention: onMention,
                           onExcerpt: (id) => {
@@ -4028,7 +4092,8 @@ window.__ModuleLoader__.load({
     function ProseBlock(props) {
       const block = props.block;
       const ranges = excerptRangesForBlock(props.excerpts, props.chapterIndex, props.blockIndex, block.text.length);
-      const children = renderBlockContent(block.text, props.highlight, ranges, props.onMention, props.onExcerpt);
+      const thoughtRanges = props.thoughtsOpen ? thoughtRangesForBlock(props.thoughts, props.chapterIndex, props.blockIndex, block.text.length) : [];
+      const children = renderBlockContent(block.text, props.highlight, ranges, thoughtRanges, props.onMention, props.onExcerpt);
       const map = { h1: 'h1', h2: 'h2', h3: 'h3', h4: 'h4', li: 'li', quote: 'blockquote', pre: 'pre' };
       const tag = map[block.type] || 'p';
       const isCjk = /[\u3400-\u9fff]/.test(block.text);

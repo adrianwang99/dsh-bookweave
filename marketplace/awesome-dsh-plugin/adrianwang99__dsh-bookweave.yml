@@ -1,7 +1,7 @@
 url: https://github.com/adrianwang99/dsh-bookweave
 name: adrianwang99/dsh-bookweave
 category: ui
-tarball: https://github.com/adrianwang99/dsh-bookweave/releases/download/v0.12.1/dsh-bookweave-0.12.1.tgz
+tarball: https://github.com/adrianwang99/dsh-bookweave/releases/download/v0.13.0/dsh-bookweave-0.13.0.tgz
 description:
   en: "EPUB reader for DSH with a shelf, excerpts, a book list of every title the text mentions, and an AI chapter guide whose cards link back to the source paragraphs."
   zh: "DSH 里的 EPUB 阅读器：书架、摘录、全书引书书单，以及可点击溯源到原文段落的 AI 章节导览。"
