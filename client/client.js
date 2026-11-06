@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.18.6';
+    const CLIENT_VERSION = '0.18.7';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -2479,7 +2479,7 @@ window.__ModuleLoader__.load({
       '.bw-translate-menu__off:hover{color:var(--dsw-alias-state-error-primary)}',
       '.bw-translate-menu__status{font-size:10.5px;color:var(--dsw-alias-label-secondary)}',
       '.bw-translate-menu__status--error{color:var(--dsw-alias-state-error-primary)}',
-      '.bw-translation{font-size:calc(12.5px * var(--bw-scale,1));line-height:1.85;color:var(--dsw-alias-label-secondary);margin-top:7px;padding-left:9px;border-left:2px solid var(--dsw-alias-border-l2);font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;white-space:pre-wrap;word-break:break-word}',
+      '.bw-translation{position:relative;font-size:calc(12.5px * var(--bw-scale,1));line-height:1.85;color:var(--dsw-alias-label-secondary);margin-top:7px;padding-left:9px;border-left:2px solid var(--dsw-alias-border-l2);font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;white-space:pre-wrap;word-break:break-word}',
       '.bw-thought-underline{text-decoration-line:underline;text-decoration-style:dashed;text-decoration-thickness:1.5px;text-underline-offset:3px;text-decoration-skip-ink:none}',
       '.bw-thought-pop{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.32)}',
       '.bw-thought-pop__card{width:min(440px,92vw);max-height:80vh;overflow:auto;display:flex;flex-direction:column;gap:8px;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:12px;box-shadow:0 18px 48px rgba(0,0,0,.35);padding:14px}',
@@ -2805,6 +2805,15 @@ window.__ModuleLoader__.load({
       );
     }
 
+    function closestTranslationElement(node) {
+      let element = node && node.nodeType === 1 ? node : node && node.parentElement;
+      while (element) {
+        if (element.classList && element.classList.contains('bw-translation')) return element;
+        element = element.parentElement;
+      }
+      return null;
+    }
+
     function closestBlockElement(node) {
       let element = node && node.nodeType === 1 ? node : node && node.parentElement;
       while (element) {
@@ -2833,6 +2842,23 @@ window.__ModuleLoader__.load({
       const ranges = [];
       for (const item of thoughts || []) {
         if (!item || item.chapterIndex !== chapterIndex) continue;
+        if ((item.target || 'original') !== 'original') continue;
+        const startBlock = item.startBlock == null ? item.blockIndex : item.startBlock;
+        const endBlock = item.endBlock == null ? startBlock : item.endBlock;
+        if (blockIndex < startBlock || blockIndex > endBlock) continue;
+        let start = blockIndex === startBlock && Number.isFinite(item.startOffset) ? item.startOffset : 0;
+        let end = blockIndex === endBlock && Number.isFinite(item.endOffset) ? item.endOffset : textLength;
+        start = Math.max(0, Math.min(textLength, start));
+        end = Math.max(start, Math.min(textLength, end));
+        if (end > start) ranges.push({ start: start, end: end, color: item.color || '#7aa2ff', id: item.id });
+      }
+      return ranges;
+    }
+
+    function translationThoughtRangesForBlock(thoughts, chapterIndex, blockIndex, textLength) {
+      const ranges = [];
+      for (const item of thoughts || []) {
+        if (!item || item.chapterIndex !== chapterIndex || item.target !== 'translation') continue;
         const startBlock = item.startBlock == null ? item.blockIndex : item.startBlock;
         const endBlock = item.endBlock == null ? startBlock : item.endBlock;
         if (blockIndex < startBlock || blockIndex > endBlock) continue;
@@ -4199,6 +4225,7 @@ window.__ModuleLoader__.load({
           endOffset: null,
           chapterTitle: chapter.title,
           sourceText: sourceText,
+          target: 'original',
           text: '',
           color: THOUGHT_COLORS[0],
         });
@@ -4216,6 +4243,7 @@ window.__ModuleLoader__.load({
           endOffset: pendingSelection.endOffset,
           chapterTitle: chapter.title,
           sourceText: String(pendingSelection.text || '').replace(/\s+/g, ' ').trim().slice(0, 200),
+          target: pendingSelection.target || 'original',
           text: '',
           color: THOUGHT_COLORS[0],
         });
@@ -4233,6 +4261,7 @@ window.__ModuleLoader__.load({
           endOffset: thought.endOffset,
           chapterTitle: thought.chapterTitle || chapter.title,
           sourceText: thought.sourceText || '',
+          target: thought.target || 'original',
           text: thought.text,
           color: thought.color || THOUGHT_COLORS[0],
         });
@@ -4258,6 +4287,7 @@ window.__ModuleLoader__.load({
             endOffset: thoughtDraft.endOffset == null ? null : thoughtDraft.endOffset,
             chapterTitle: thoughtDraft.chapterTitle || chapter.title,
             sourceText: thoughtDraft.sourceText || '',
+            target: thoughtDraft.target || 'original',
             text: value,
             color: thoughtDraft.color || THOUGHT_COLORS[0],
             createdAt: Date.now(),
@@ -4330,6 +4360,11 @@ window.__ModuleLoader__.load({
             setPendingSelection(null);
             return;
           }
+          const translationStart = closestTranslationElement(range.startContainer);
+          const translationEnd = closestTranslationElement(range.endContainer);
+          const translationEl = translationStart && translationStart === translationEnd ? translationStart : null;
+          const startHost = translationEl || (startElement.querySelector('.bw-block__body') || startElement);
+          const endHost = translationEl || (endElement.querySelector('.bw-block__body') || endElement);
           let rect = { top: 0, bottom: 0, left: 0, width: 0 };
           try {
             const measured = range.getBoundingClientRect();
@@ -4340,9 +4375,10 @@ window.__ModuleLoader__.load({
           setPendingSelection({
             chapterIndex: chapterIndex,
             startBlock: Number(startElement.getAttribute('data-block')),
-            startOffset: selectionOffsetWithin(startElement, range.startContainer, range.startOffset),
+            startOffset: selectionOffsetWithin(startHost, range.startContainer, range.startOffset),
             endBlock: Number(endElement.getAttribute('data-block')),
-            endOffset: selectionOffsetWithin(endElement, range.endContainer, range.endOffset),
+            endOffset: selectionOffsetWithin(endHost, range.endContainer, range.endOffset),
+            target: translationEl ? 'translation' : 'original',
             text: text,
             rect: { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width },
           });
@@ -4698,6 +4734,44 @@ window.__ModuleLoader__.load({
                           h('button', { type: 'button', className: 'bw-thought__op', onClick: () => deleteThought(thought.id) }, t('thoughtDelete'))
                         )
                       );
+                    const renderMarkers = (list, textLength) => {
+                      if (thoughtsOpen || !list.length) return null;
+                      const sorted = list.slice().sort((a, b) => {
+                        const aStart = a.startOffset == null ? Number.MAX_SAFE_INTEGER : a.startOffset;
+                        const bStart = b.startOffset == null ? Number.MAX_SAFE_INTEGER : b.startOffset;
+                        return aStart - bStart || (a.createdAt || 0) - (b.createdAt || 0);
+                      });
+                      const single = sorted.length === 1;
+                      return h(
+                        'div',
+                        { className: 'bw-thought-bars' },
+                        sorted.map((thought, markerIndex) => {
+                          const total = textLength || 1;
+                          const ratio =
+                            thought.startOffset != null
+                              ? Math.min(1, Math.max(0, thought.startOffset / total))
+                              : single
+                                ? 0
+                                : markerIndex / sorted.length;
+                          return h('button', {
+                            key: thought.id,
+                            type: 'button',
+                            className: 'bw-thought-bar',
+                            style: single
+                              ? { '--bw-thought-color': thought.color || THOUGHT_COLORS[0], top: '0', height: '100%', marginTop: '0' }
+                              : {
+                                  '--bw-thought-color': thought.color || THOUGHT_COLORS[0],
+                                  top: (ratio * 100).toFixed(2) + '%',
+                                  height: '18px',
+                                  marginTop: '-9px',
+                                },
+                            onClick: toggleThoughts,
+                            'aria-label': t('thoughtsExpand'),
+                            title: thought.text || t('thoughtsExpand'),
+                          });
+                        })
+                      );
+                    };
                     return h(
                       'div',
                       { key: blockIndex, 'data-block': blockIndex, className: cx('bw-block', focused && 'bw-block--focus', flashed && 'bw-block--flash') },
@@ -4722,42 +4796,31 @@ window.__ModuleLoader__.load({
                               setShowRail(true);
                             },
                           }),
-                          !thoughtsOpen && blockThoughts.length
-                            ? h(
-                                'div',
-                                { className: 'bw-thought-bars' },
-                                blockThoughts
-                                  .slice()
-                                  .sort((a, b) => {
-                                    const aStart = a.startOffset == null ? Number.MAX_SAFE_INTEGER : a.startOffset;
-                                    const bStart = b.startOffset == null ? Number.MAX_SAFE_INTEGER : b.startOffset;
-                                    return aStart - bStart || (a.createdAt || 0) - (b.createdAt || 0);
-                                  })
-                                  .map((thought, markerIndex) => {
-                                    const total = String(block.text || '').length || 1;
-                                    const ratio =
-                                      thought.startOffset != null
-                                        ? Math.min(1, Math.max(0, thought.startOffset / total))
-                                        : blockThoughts.length > 1
-                                          ? markerIndex / blockThoughts.length
-                                          : 0;
-                                    return h('button', {
-                                      key: thought.id,
-                                      type: 'button',
-                                      className: 'bw-thought-bar',
-                                      style: {
-                                        '--bw-thought-color': thought.color || THOUGHT_COLORS[0],
-                                        top: (ratio * 100).toFixed(2) + '%',
-                                      },
-                                      onClick: toggleThoughts,
-                                      'aria-label': t('thoughtsExpand'),
-                                      title: thought.text || t('thoughtsExpand'),
-                                    });
-                                  })
-                              )
-                            : null
+                          renderMarkers(
+                            blockThoughts.filter((thought) => (thought.target || 'original') === 'original'),
+                            String(block.text || '').length
+                          )
                         ),
-                        translations[blockIndex] ? h('div', { className: 'bw-translation' }, translations[blockIndex]) : null
+                        translations[blockIndex]
+                          ? h(
+                              'div',
+                              { className: 'bw-translation' },
+                              renderMarkers(
+                                blockThoughts.filter((thought) => thought.target === 'translation'),
+                                String(translations[blockIndex] || '').length
+                              ),
+                              renderBlockContent(
+                                String(translations[blockIndex] || ''),
+                                null,
+                                [],
+                                thoughtsOpen
+                                  ? translationThoughtRangesForBlock(thoughts, chapterIndex, blockIndex, String(translations[blockIndex] || '').length)
+                                  : [],
+                                null,
+                                null
+                              )
+                            )
+                          : null
                       ),
                       h(
                         'div',
@@ -6076,6 +6139,8 @@ window.__ModuleLoader__.load({
         BrowserPanel: BrowserPanel,
         ExcerptsPanel: ExcerptsPanel,
         GuidePanel: GuidePanel,
+        thoughtRangesForBlock: thoughtRangesForBlock,
+        translationThoughtRangesForBlock: translationThoughtRangesForBlock,
         SidebarIcon: SidebarIcon,
       },
       apply(ctx) {

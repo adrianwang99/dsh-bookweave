@@ -745,6 +745,26 @@ async function main() {
     assert.equal(typeof plugin.core, 'object', 'plugin.core must be the pure core object');
   });
 
+  await test('thought ranges: original and translation anchors stay separate', () => {
+    const fn = plugin.__test;
+    assert.equal(typeof fn.thoughtRangesForBlock, 'function', 'thoughtRangesForBlock test seam');
+    assert.equal(typeof fn.translationThoughtRangesForBlock, 'function', 'translation ranges test seam');
+    const thoughts = [
+      { id: 'orig', chapterIndex: 0, blockIndex: 0, startBlock: 0, startOffset: 2, endBlock: 0, endOffset: 6, target: 'original' },
+      { id: 'trans', chapterIndex: 0, blockIndex: 0, startBlock: 0, startOffset: 1, endBlock: 0, endOffset: 4, target: 'translation' },
+    ];
+    assert.deepEqual(
+      fn.thoughtRangesForBlock(thoughts, 0, 0, 10).map((range) => range.id),
+      ['orig'],
+      'original ranges must ignore translation-anchored thoughts'
+    );
+    assert.deepEqual(
+      fn.translationThoughtRangesForBlock(thoughts, 0, 0, 5).map((range) => range.id),
+      ['trans'],
+      'translation ranges must only include translation-anchored thoughts'
+    );
+  });
+
   await registerContractTests(core);
 
   const expected = await readExpectedJson();

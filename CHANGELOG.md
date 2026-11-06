@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.18.7] - 2025-11-06
+
+- Fixed notes written on a translation: selections inside the translated paragraph are now offset against the translation text and stored with `target: 'translation'`, so expanding the notes rail underlines the translated text instead of losing the range on the original paragraph.
+- Collapsed notes markers: a single note renders a full-height bar (no more small dot); multiple notes render 18px colored segments positioned by text offset.
+- Thought-range helpers split original vs translation anchors, covered by a Node unit test.
+
 ## [0.18.6] - 2025-11-06
 
 - Collapsed margin notes now render one colored marker per thought (positioned by its text offset), instead of a single bar for the whole paragraph.
