@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.18.0';
+    const CLIENT_VERSION = '0.18.1';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -1913,6 +1913,80 @@ window.__ModuleLoader__.load({
       return true;
     }
 
+    const ZIP_CRC_TABLE = (() => {
+      const table = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+        table[n] = c >>> 0;
+      }
+      return table;
+    })();
+
+    function zipCrc32(bytes) {
+      let crc = 0xffffffff;
+      for (let i = 0; i < bytes.length; i++) crc = ZIP_CRC_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+      return (crc ^ 0xffffffff) >>> 0;
+    }
+
+    /** 把解压后的 EPUB 目录重新打包成 ZIP（存储模式），用于导入 .epub 文件夹。 */
+    function buildStoredZip(entries) {
+      const encoder = new TextEncoder();
+      const locals = [];
+      const centrals = [];
+      let offset = 0;
+      for (const entry of entries) {
+        const data = entry.data;
+        const name = encoder.encode(entry.name);
+        const crc = zipCrc32(data);
+        const local = new Uint8Array(30 + name.length);
+        const localView = new DataView(local.buffer);
+        localView.setUint32(0, 0x04034b50, true);
+        localView.setUint16(4, 20, true);
+        localView.setUint32(14, crc, true);
+        localView.setUint32(18, data.length, true);
+        localView.setUint32(22, data.length, true);
+        localView.setUint16(26, name.length, true);
+        local.set(name, 30);
+        locals.push(local, data);
+        const central = new Uint8Array(46 + name.length);
+        const centralView = new DataView(central.buffer);
+        centralView.setUint32(0, 0x02014b50, true);
+        centralView.setUint16(4, 20, true);
+        centralView.setUint16(6, 20, true);
+        centralView.setUint32(16, crc, true);
+        centralView.setUint32(20, data.length, true);
+        centralView.setUint32(24, data.length, true);
+        centralView.setUint16(28, name.length, true);
+        centralView.setUint32(42, offset, true);
+        central.set(name, 46);
+        centrals.push(central);
+        offset += local.length + data.length;
+      }
+      let centralSize = 0;
+      for (const central of centrals) centralSize += central.length;
+      const end = new Uint8Array(22);
+      const endView = new DataView(end.buffer);
+      endView.setUint32(0, 0x06054b50, true);
+      endView.setUint16(8, entries.length, true);
+      endView.setUint16(10, entries.length, true);
+      endView.setUint32(12, centralSize, true);
+      endView.setUint32(16, offset, true);
+      const total = offset + centralSize + end.length;
+      const output = new Uint8Array(total);
+      let cursor = 0;
+      for (const chunk of locals) {
+        output.set(chunk, cursor);
+        cursor += chunk.length;
+      }
+      for (const central of centrals) {
+        output.set(central, cursor);
+        cursor += central.length;
+      }
+      output.set(end, cursor);
+      return output;
+    }
+
     async function runLimited(tasks, limit) {
       const results = new Array(tasks.length);
       let next = 0;
@@ -3090,14 +3164,42 @@ window.__ModuleLoader__.load({
       }
 
       async function importFolder(fileList) {
-        const files = Array.prototype.slice.call(fileList || []).filter((file) => /\.epub$/i.test(file.name || ''));
-        if (!files.length) {
+        const picked = Array.prototype.slice.call(fileList || []);
+        const books = picked.filter((file) => /\.epub$/i.test(file.name || ''));
+        // 有些「.epub」其实是解压后的文件夹：按 META-INF/container.xml 找到书根目录，重新打包后导入。
+        const roots = new Set();
+        for (const file of picked) {
+          const rel = String(file.webkitRelativePath || file.name || '').replace(/\\/g, '/');
+          const marker = rel.toLowerCase().lastIndexOf('meta-inf/container.xml');
+          if (marker < 0) continue;
+          roots.add(rel.slice(0, marker));
+        }
+        for (const root of roots) {
+          const entries = [];
+          for (const file of picked) {
+            const rel = String(file.webkitRelativePath || file.name || '').replace(/\\/g, '/');
+            if (!rel.startsWith(root) || rel.length <= root.length) continue;
+            try {
+              entries.push({ name: rel.slice(root.length), data: new Uint8Array(await file.arrayBuffer()) });
+            } catch (error) {
+              /* ignore unreadable file */
+            }
+          }
+          if (!entries.some((entry) => /(^|\/)mimetype$/i.test(entry.name))) continue;
+          entries.sort((a, b) => (/(^|\/)mimetype$/i.test(a.name) ? -1 : /(^|\/)mimetype$/i.test(b.name) ? 1 : 0));
+          const zip = buildStoredZip(entries);
+          if (zip.length > 220 * 1024 * 1024) continue;
+          const base = root.replace(/\/+$/, '').split('/').filter(Boolean).pop() || 'imported';
+          const name = /\.epub$/i.test(base) ? base : base + '.epub';
+          books.push(new File([zip], name, { type: 'application/epub+zip' }));
+        }
+        if (!books.length) {
           notify(t('folderNoEpub'));
           return;
         }
         const categoryId = activeCategory !== 'all' && activeCategory !== 'uncategorized' ? activeCategory : '';
         let imported = 0;
-        for (const file of files) {
+        for (const file of books) {
           setBusy({ title: file.name, stage: t('stageUnzip'), ratio: 0.02 });
           const ok = await importBookFile(file, { openBook: false, categoryId: categoryId });
           if (ok) imported += 1;
@@ -3110,7 +3212,42 @@ window.__ModuleLoader__.load({
         if (inputRef.current) inputRef.current.click();
       }
 
-      function pickFolder() {
+      async function pickFolder() {
+        // 优先用 File System Access API：能递归遍历目录，也能识别解压后的 .epub 文件夹。
+        if (typeof window.showDirectoryPicker === 'function') {
+          let dir = null;
+          try {
+            dir = await window.showDirectoryPicker({ mode: 'read' });
+          } catch (error) {
+            if (error && error.name === 'AbortError') return;
+          }
+          if (dir) {
+            try {
+              const files = [];
+              const walk = async (handle, prefix) => {
+                for await (const [name, child] of handle.entries()) {
+                  if (child.kind === 'file') {
+                    const file = await child.getFile();
+                    files.push({
+                      name: file.name,
+                      size: file.size,
+                      type: file.type,
+                      webkitRelativePath: prefix + name,
+                      arrayBuffer: () => file.arrayBuffer(),
+                    });
+                  } else if (child.kind === 'directory') {
+                    await walk(child, prefix + name + '/');
+                  }
+                }
+              };
+              await walk(dir, '');
+              await importFolder(files);
+            } catch (error) {
+              notify(t('folderFailed'));
+            }
+            return;
+          }
+        }
         if (folderRef.current) folderRef.current.click();
       }
 
@@ -5334,8 +5471,9 @@ window.__ModuleLoader__.load({
         categoryEmptyTitle: '这个分类还没有书',
         categoryEmptyText: '在书封面上点分类按钮，把书移动到这里。',
         importFolder: '导入文件夹',
-        folderNoEpub: '文件夹里没有 EPUB 文件',
+        folderNoEpub: '没有找到 EPUB：支持 .epub 文件或解压后的 .epub 文件夹',
         folderImported: '已从文件夹导入 {count} 本',
+        folderFailed: '读取文件夹失败，请改用「导入」选择文件',
         library: '我的书架',
         libraryMeta: '{books} 本书 · {mentions} 次提及',
         loading: '正在读取…',
@@ -5539,8 +5677,9 @@ window.__ModuleLoader__.load({
         categoryEmptyTitle: 'No books in this category',
         categoryEmptyText: 'Use the category button on a book cover to move it here.',
         importFolder: 'Import folder',
-        folderNoEpub: 'No EPUB files found in that folder',
+        folderNoEpub: 'No EPUB found: .epub files and extracted .epub folders are supported',
         folderImported: 'Imported {count} book(s) from the folder',
+        folderFailed: 'Could not read the folder; use Import to pick files instead',
         library: 'My shelf',
         libraryMeta: '{books} books · {mentions} mentions',
         loading: 'Loading…',

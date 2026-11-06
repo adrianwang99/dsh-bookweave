@@ -4,7 +4,7 @@
   <p><strong>Read EPUBs inside DSH, discover every book they cite, and let an AI guide you through the chapters.</strong></p>
   <p>
     <a href="https://github.com/adrianwang99/dsh-bookweave/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green" /></a>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.18.0-blue" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.18.1-blue" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-DSH%20Web-7c5cff" />
     <img alt="Tests" src="https://img.shields.io/badge/tests-node--only-success" />
   </p>
@@ -19,7 +19,7 @@ BookWeave is a [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-
 
 | | |
 | --- | --- |
-| **Shelf & folder import** | Left category sidebar (create / rename / delete), per-book category picker on every cover, and one-click **Import folder**: recursively imports every EPUB under the chosen folder (duplicates skipped) into the active category. |
+| **Shelf & folder import** | Left category sidebar (create / rename / delete), per-book category picker on every cover, and one-click **Import folder**: recursively imports every EPUB under the chosen folder (duplicates skipped) into the active category. Both normal `.epub` files and **extracted `.epub` folders** (with `META-INF/container.xml`) are supported. |
 | **Shelf** | Import `.epub` by click or drag & drop; 2:3 portrait covers extracted from the EPUB; book title, author and reading percentage only. |
 | **Reader** | Serif prose, adjustable font size, TOC built from the book's NCX/nav boundaries (Calibre-style split files merge into their chapter; parts are marked), chapter navigation, remembered progress. No fixed header — the reading area and the right rail both start at the top of the window. |
 | **Book list** | Extracts every book the current book mentions: 《》 titles, English “quoted title” cues and a curated lexicon, with noise filters (self-references, TOC, chapter headings, periodicals). Each entry links back to the paragraph where it appears. |

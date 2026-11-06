@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.18.1] - 2025-11-06
+
+- Folder import now also recognizes **extracted `.epub` folders** (a directory whose name ends with `.epub`, or a folder containing `META-INF/container.xml`): files are re-packed into an in-memory EPUB ZIP and parsed normally.
+- Clearer "no EPUB found" message covering both `.epub` files and extracted folders.
+
 ## [0.18.0] - 2025-11-06
 
 - Shelf categories: left sidebar with All / Uncategorized / custom categories, create, rename and delete; each book cover has a category picker; clicking a category filters the shelf.

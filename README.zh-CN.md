@@ -4,7 +4,7 @@
   <p><strong>在 DSH 左侧栏里读 EPUB，自动发现书里提到的每一本书，再用 AI 生成可点击的章节导览。</strong></p>
   <p>
     <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green" /></a>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.18.0-blue" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.18.1-blue" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-DSH%20Web-7c5cff" />
   </p>
   <p><a href="README.md">English</a> | 中文</p>
@@ -18,7 +18,7 @@
 
 | | |
 | --- | --- |
-| **书架与文件夹导入** | 左侧分类栏（新建 / 重命名 / 删除），每本书封面上的分类选择器；「导入文件夹」会递归导入所选文件夹下的全部 EPUB（自动跳过重复书），并放进当前分类。 |
+| **书架与文件夹导入** | 左侧分类栏（新建 / 重命名 / 删除），每本书封面上的分类选择器；「导入文件夹」会递归导入所选文件夹下的全部 EPUB（自动跳过重复书），并放进当前分类；普通 `.epub` 文件和解压后的 `.epub` 文件夹（含 `META-INF/container.xml`）都能识别。 |
 | **书架** | 点选或拖拽导入 `.epub`；从 EPUB 内嵌封面显示 2:3 竖版封面；卡片只保留书名、作者和阅读百分比。 |
 | **阅读器** | 衬线排版、字号调节、按 NCX/nav 目录边界生成的目录（Calibre 拆分的多文件会并入同一章，分部有标记）、章节翻页、记住进度；无固定顶栏，阅读区和右侧栏都顶到窗口顶部。 |
 | **书单** | 提取全书提及的书：《》书名、英文引号书名线索和词库，并过滤自引用、目录、章节标题、期刊等噪声；每条都能定位回出现段落。 |
