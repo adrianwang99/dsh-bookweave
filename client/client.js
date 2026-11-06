@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.18.2';
+    const CLIENT_VERSION = '0.18.3';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -2441,7 +2441,7 @@ window.__ModuleLoader__.load({
       '.bw-guide__item:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px}',
       '.bw-guide__item--active{color:var(--dsw-alias-brand-primary);font-weight:650}',
       '.bw-guide__item--part{font-weight:650;color:var(--dsw-alias-label-primary)}',
-      '.bw-guide__itemnum{flex:none;width:16px;font-size:10px;color:var(--dsw-alias-label-secondary);text-align:center}',
+
       '.bw-guide__itemtitle{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.bw-guide__itemcount{flex:none;font-size:10px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
       '.bw-guide__status{font-size:10.5px;color:var(--dsw-alias-label-secondary);line-height:1.5}',
@@ -4742,6 +4742,7 @@ window.__ModuleLoader__.load({
                   onThoughtEdit: editThoughtFromPanel,
                   onThoughtDelete: deleteThought,
                   structure: structure,
+                  chapterMentions: chapterMentions,
                   structureChapter: structureChapter,
                   onSelectChapter: (index) => {
                     setStructureChapter(index);
@@ -4984,7 +4985,7 @@ window.__ModuleLoader__.load({
                   if (event.key === 'Escape') closeMenuNow();
                 },
               },
-              h('span', { className: 'bw-guide__chaptertext' }, '第 ' + (current.index + 1) + ' 章 · ' + (current.title || t('chapterFallback'))),
+              h('span', { className: 'bw-guide__chaptertext' }, current.title || t('chapterFallback')),
               h('span', { className: 'bw-guide__caret', 'aria-hidden': 'true' }, '▾')
             ),
             menuOpen
@@ -5005,9 +5006,12 @@ window.__ModuleLoader__.load({
                           closeMenuNow();
                         },
                       },
-                      h('span', { className: 'bw-guide__itemnum' }, String(chapter.index + 1)),
                       h('span', { className: 'bw-guide__itemtitle' }, chapter.title || t('chapterFallback')),
-                      h('span', { className: 'bw-guide__itemcount' }, String(chapter.totals.claims))
+                      h(
+                        'span',
+                        { className: 'bw-guide__itemcount' },
+                        String(((props.chapterMentions && props.chapterMentions.get(chapter.index)) || 0))
+                      )
                     )
                   )
                 )
@@ -5229,6 +5233,7 @@ window.__ModuleLoader__.load({
                 t: t,
                 record: props.record,
                 structure: props.structure,
+                chapterMentions: props.chapterMentions,
                 chapterIndex: props.structureChapter,
                 onSelectChapter: props.onSelectChapter,
                 onJump: props.onGuideJump,

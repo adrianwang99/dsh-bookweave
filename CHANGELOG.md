@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.18.3] - 2025-11-06
+
+- The guide chapter dropdown now mirrors the main TOC: no leading index numbers, chapter titles only, and the same per-chapter mention counts. The selector label also shows just the chapter title instead of “第 N 章 · …”.
+
 ## [0.18.2] - 2025-11-06
 
 - Selection toolbar buttons (thought / excerpt / cancel) are now icon-only, with the function name shown on hover (styled tooltip + native title).

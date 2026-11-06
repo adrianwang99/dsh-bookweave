@@ -4,7 +4,7 @@
   <p><strong>Read EPUBs inside DSH, discover every book they cite, and let an AI guide you through the chapters.</strong></p>
   <p>
     <a href="https://github.com/adrianwang99/dsh-bookweave/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green" /></a>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.18.2-blue" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.18.3-blue" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-DSH%20Web-7c5cff" />
     <img alt="Tests" src="https://img.shields.io/badge/tests-node--only-success" />
   </p>
