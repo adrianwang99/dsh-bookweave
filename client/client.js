@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.11.0';
+    const CLIENT_VERSION = '0.12.0';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -1702,6 +1702,8 @@ window.__ModuleLoader__.load({
     }
 
     const SEARCH_TEMPLATE_KEY = 'dsh-bookweave:search-template';
+    const THOUGHTS_OPEN_KEY = 'dsh-bookweave:thoughts-open';
+    const THOUGHT_COLORS = ['#7aa2ff', '#e5675f', '#5cc28a', '#e0b457', '#b18cff', '#9aa4b2'];
 
     function readSearchTemplate() {
       try {
@@ -1852,7 +1854,7 @@ window.__ModuleLoader__.load({
       '.bw-center{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:column;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);overflow:hidden;position:relative}',
       '.bw-center__scroll{flex:1 1 auto;overflow:auto;padding:14px 34px 36px;scroll-behavior:smooth}',
       '.bw-center__foot{flex:none;display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1)}',
-      '.bw-prose{max-width:880px;margin:0 auto;font-family:"Songti SC","Noto Serif SC","Source Han Serif SC",Georgia,"Times New Roman",serif;font-size:calc(16px * var(--bw-scale,1));line-height:1.95;word-break:break-word}',
+      '.bw-prose{max-width:880px;margin:0 auto;transition:max-width .3s ease;font-family:"Songti SC","Noto Serif SC","Source Han Serif SC",Georgia,"Times New Roman",serif;font-size:calc(16px * var(--bw-scale,1));line-height:1.95;word-break:break-word}',
       '.bw-prose p{margin:0 0 14px}.bw-prose p.bw-prose__cjk{text-indent:2em}',
       '.bw-prose h1,.bw-prose h2,.bw-prose h3,.bw-prose h4{margin:26px 0 14px;line-height:1.4;font-family:inherit}',
       '.bw-prose h1{font-size:1.5em}.bw-prose h2{font-size:1.28em}.bw-prose h3{font-size:1.12em}.bw-prose h4{font-size:1em}',
@@ -2024,7 +2026,7 @@ window.__ModuleLoader__.load({
       '.bw-gcard__text{font-size:12px;line-height:1.65;color:var(--dsw-alias-label-primary);word-break:break-word}',
       '.bw-gcard__loc{font-size:10px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
       '.bw-gcard__evidence{display:flex;flex-direction:column;gap:4px;padding:4px 0 0 8px;margin-left:12px;border-left:1px dashed var(--dsw-alias-border-l2)}',
-      '.bw-block{display:flex;gap:22px;align-items:flex-start;margin:0 -6px;padding:0 6px;border-radius:8px;transition:background .12s,box-shadow .12s}',
+      '.bw-block{position:relative;display:flex;gap:22px;align-items:flex-start;transition:gap .3s ease;margin:0 -6px;padding:0 6px;border-radius:8px;transition:background .12s,box-shadow .12s}',
       '.bw-block--focus{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 9%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 22%,transparent)}',
       '.bw-block--flash{animation:bw-flash 1.6s ease}',
       '@keyframes bw-flash{0%{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 20%,transparent)}70%{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent)}100%{background:transparent}}',
@@ -2080,9 +2082,21 @@ window.__ModuleLoader__.load({
       '.bw-float__btn:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
       '.bw-float__btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.bw-float__btn--primary{color:var(--dsw-alias-label-primary);font-weight:600}',
-      '.bw-block__text{flex:0 1 600px;min-width:0;max-width:600px}',
-      '.bw-block__margin{flex:0 0 220px;width:220px;padding-top:2px;display:flex;flex-direction:column;gap:8px;min-width:0}',
-      '.bw-masthead,.bw-prose>h1{max-width:600px}',
+      '.bw-block__text{flex:0 1 600px;min-width:0;max-width:600px;transition:flex-basis .3s ease,max-width .3s ease}',
+      '.bw-block__margin{flex:0 0 220px;width:220px;padding-top:2px;display:flex;flex-direction:column;gap:8px;min-width:0;transition:flex-basis .3s ease,width .3s ease,opacity .2s ease}',
+      '.bw-prose--collapsed{max-width:720px}',
+      '.bw-prose--collapsed .bw-block{gap:0}',
+      '.bw-prose--collapsed .bw-block__text{flex-basis:720px;max-width:720px}',
+      '.bw-prose--collapsed .bw-block__margin{flex-basis:0;width:0;opacity:0;overflow:hidden;pointer-events:none}',
+      '.bw-prose--collapsed .bw-masthead,.bw-prose--collapsed>h1{max-width:720px}',
+      '.bw-thought-bar{position:absolute;right:-16px;top:2px;bottom:2px;width:14px;border:0;padding:0;background:transparent;cursor:pointer;display:flex;justify-content:center;align-items:stretch;z-index:2;animation:bw-bar-in .3s ease}',
+      '.bw-thought-bar::before{content:"";width:3px;border-radius:2px;background:var(--bw-thought-color,#7aa2ff);transition:width .15s ease}',
+      '.bw-thought-bar:hover::before{width:5px}',
+      '@keyframes bw-bar-in{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}',
+      '.bw-thought__colors{display:flex;gap:6px;margin:1px 0 2px}',
+      '.bw-thought__swatch{width:14px;height:14px;padding:0;border-radius:50%;border:2px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}',
+      '.bw-thought__swatch--on{border-color:var(--dsw-alias-label-primary)}',
+      '.bw-masthead,.bw-prose>h1{max-width:600px;transition:max-width .3s ease}',
       '.bw-thought{display:flex;flex-direction:column;gap:4px;padding:2px 0 2px 9px;border-left:2px solid color-mix(in srgb,var(--dsw-alias-brand-primary) 42%,transparent)}',
       '.bw-thought__quote{font-size:10.5px;line-height:1.6;color:var(--dsw-alias-label-secondary);font-style:italic;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}',
       '.bw-thought__text{font-family:"Xingkai SC","Kaiti SC","STKaiti","KaiTi","Segoe Script","Bradley Hand",cursive;font-size:14.5px;line-height:1.75;color:color-mix(in srgb,var(--dsw-alias-label-primary) 88%,var(--dsw-alias-brand-primary));white-space:pre-wrap;word-break:break-word}',
@@ -3020,6 +3034,14 @@ window.__ModuleLoader__.load({
       const [excerpts, setExcerpts] = React.useState([]);
       const [thoughts, setThoughts] = React.useState([]);
       const [thoughtDraft, setThoughtDraft] = React.useState(null);
+      const [thoughtsOpen, setThoughtsOpen] = React.useState(() => {
+        try {
+          const value = window.localStorage.getItem(THOUGHTS_OPEN_KEY);
+          return value === null ? true : value !== '0';
+        } catch (error) {
+          return true;
+        }
+      });
       const [selectedExcerptId, setSelectedExcerptId] = React.useState('');
       const [pendingSelection, setPendingSelection] = React.useState(null);
       const [browserUrl, setBrowserUrl] = React.useState('');
@@ -3169,8 +3191,20 @@ window.__ModuleLoader__.load({
         dbSaveThoughts(record.id, next).catch(() => {});
       }
 
+      function toggleThoughts() {
+        setThoughtsOpen((current) => {
+          const next = !current;
+          try {
+            window.localStorage.setItem(THOUGHTS_OPEN_KEY, next ? '1' : '0');
+          } catch (error) {
+            /* ignore */
+          }
+          return next;
+        });
+      }
+
       function startThought(blockIndex, quote) {
-        setThoughtDraft({ id: '', chapterIndex: chapterIndex, blockIndex: blockIndex, text: '', quote: quote || '' });
+        setThoughtDraft({ id: '', chapterIndex: chapterIndex, blockIndex: blockIndex, text: '', quote: quote || '', color: THOUGHT_COLORS[0] });
       }
 
       function startThoughtFromSelection() {
@@ -3180,7 +3214,7 @@ window.__ModuleLoader__.load({
       }
 
       function editThought(thought) {
-        setThoughtDraft({ id: thought.id, chapterIndex: thought.chapterIndex, blockIndex: thought.blockIndex, text: thought.text, quote: thought.quote || '' });
+        setThoughtDraft({ id: thought.id, chapterIndex: thought.chapterIndex, blockIndex: thought.blockIndex, text: thought.text, quote: thought.quote || '', color: thought.color || THOUGHT_COLORS[0] });
       }
 
       function saveThought() {
@@ -3199,6 +3233,7 @@ window.__ModuleLoader__.load({
             blockIndex: thoughtDraft.blockIndex,
             quote: thoughtDraft.quote || '',
             text: value,
+            color: thoughtDraft.color || THOUGHT_COLORS[0],
             createdAt: Date.now(),
           };
           commitThoughts([thought].concat(thoughts));
@@ -3471,14 +3506,14 @@ window.__ModuleLoader__.load({
                 h('button', { type: 'button', className: 'bw-float__btn', onClick: () => setShowRail((value) => !value), 'aria-pressed': showRail }, t('insights')),
                 h('button', { type: 'button', className: 'bw-float__btn', onClick: () => setScale((value) => Math.max(0.85, Math.round((value - 0.08) * 100) / 100)), 'aria-label': t('fontSmaller') }, 'A−'),
                 h('button', { type: 'button', className: 'bw-float__btn', onClick: () => setScale((value) => Math.min(1.4, Math.round((value + 0.08) * 100) / 100)), 'aria-label': t('fontLarger') }, 'A＋'),
-                h('button', { type: 'button', className: 'bw-float__btn bw-float__btn--primary', onClick: props.onExport }, t('export'))
+                h('button', { type: 'button', className: 'bw-float__btn', onClick: toggleThoughts, 'aria-pressed': thoughtsOpen }, t(thoughtsOpen ? 'thoughtsCollapse' : 'thoughtsExpand'))
               ),
               h(
                 'div',
                 { className: 'bw-center__scroll', ref: scrollRef, onScroll: handleScroll, onMouseUp: handleSelection, onMouseDown: () => { if (pendingSelection) setPendingSelection(null); }, tabIndex: 0, role: 'region', 'aria-label': record.meta.title || t('untitled') },
                 h(
                   'div',
-                  { className: 'bw-prose' },
+                  { className: cx('bw-prose', !thoughtsOpen && 'bw-prose--collapsed') },
                   h(
                     'div',
                     { className: 'bw-masthead' },
@@ -3503,11 +3538,26 @@ window.__ModuleLoader__.load({
                           rows: 3,
                           autoFocus: true,
                           placeholder: t('thoughtPlaceholder'),
+                          style: { color: draft.color || THOUGHT_COLORS[0] },
                           onChange: (event) => setThoughtDraft(Object.assign({}, draft, { text: event.target.value })),
                           onKeyDown: (event) => {
                             if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) saveThought();
                           },
                         }),
+                        h(
+                          'div',
+                          { className: 'bw-thought__colors' },
+                          THOUGHT_COLORS.map((color) =>
+                            h('button', {
+                              key: color,
+                              type: 'button',
+                              className: cx('bw-thought__swatch', (draft.color || THOUGHT_COLORS[0]) === color && 'bw-thought__swatch--on'),
+                              style: { background: color },
+                              'aria-label': t('thoughtColor') + ' ' + color,
+                              onClick: () => setThoughtDraft(Object.assign({}, draft, { color: color })),
+                            })
+                          )
+                        ),
                         h(
                           'div',
                           { className: 'bw-thought__ops bw-thought__ops--on' },
@@ -3520,7 +3570,7 @@ window.__ModuleLoader__.load({
                         'div',
                         { key: thought.id, className: 'bw-thought' },
                         thought.quote ? h('div', { className: 'bw-thought__quote' }, '「' + thought.quote + '」') : null,
-                        h('div', { className: 'bw-thought__text' }, thought.text),
+                        h('div', { className: 'bw-thought__text', style: { color: thought.color || THOUGHT_COLORS[0] } }, thought.text),
                         h(
                           'div',
                           { className: 'bw-thought__ops' },
@@ -3554,7 +3604,17 @@ window.__ModuleLoader__.load({
                         blockThoughts.map((thought) => (draftHere && draftHere.id === thought.id ? editor(draftHere) : card(thought))),
                         draftHere && !draftHere.id ? editor(draftHere) : null,
                         !draftHere ? h('button', { type: 'button', className: 'bw-thought-add', onClick: () => startThought(blockIndex) }, '+ ' + t('thoughtAdd')) : null
-                      )
+                      ),
+                      !thoughtsOpen && blockThoughts.length
+                        ? h('button', {
+                            type: 'button',
+                            className: 'bw-thought-bar',
+                            style: { '--bw-thought-color': blockThoughts[blockThoughts.length - 1].color || THOUGHT_COLORS[0] },
+                            onClick: toggleThoughts,
+                            'aria-label': t('thoughtsExpand'),
+                            title: t('thoughtsExpand'),
+                          })
+                        : null
                     );
                   })
                 )
@@ -3599,6 +3659,7 @@ window.__ModuleLoader__.load({
                   aiChars: aiPreview.chars,
                   onGuideJump: jumpToBlock,
                   onFocusSource: focusSource,
+                  onExport: props.onExport,
                 })
               : null
           )
@@ -4063,6 +4124,7 @@ window.__ModuleLoader__.load({
                   onLocate: props.onLocate,
                   onNotify: props.onNotify,
                   onSearch: props.onSearch,
+                  onExport: props.onExport,
                 })
         )
       );
@@ -4137,7 +4199,8 @@ window.__ModuleLoader__.load({
           { className: 'bw-toolbar bw-toolbar--sort' },
           h('button', { type: 'button', className: cx('bw-chip', sort === 'count' && 'bw-chip--on'), onClick: () => setSort('count') }, t('sortCount')),
           h('button', { type: 'button', className: cx('bw-chip', sort === 'order' && 'bw-chip--on'), onClick: () => setSort('order') }, t('sortOrder')),
-          h('button', { type: 'button', className: cx('bw-chip', searchConfigOpen && 'bw-chip--on'), onClick: openSearchConfig, 'aria-expanded': searchConfigOpen }, t('searchSource'))
+          h('button', { type: 'button', className: cx('bw-chip', searchConfigOpen && 'bw-chip--on'), onClick: openSearchConfig, 'aria-expanded': searchConfigOpen }, t('searchSource')),
+          props.onExport ? h('button', { type: 'button', className: 'bw-chip', onClick: props.onExport }, t('export')) : null
         ),
         searchConfigOpen
           ? h(
@@ -4375,6 +4438,9 @@ window.__ModuleLoader__.load({
         stageExtract: '正在扫描书名…',
         stageSave: '正在保存到本机…',
         cancel: '取消',
+        thoughtsExpand: '展开想法',
+        thoughtsCollapse: '折叠想法',
+        thoughtColor: '想法颜色',
         thoughtAdd: '想法',
         thoughtPlaceholder: '写点你的想法…',
         thoughtSave: '保存',
@@ -4557,6 +4623,9 @@ window.__ModuleLoader__.load({
         stageExtract: 'Scanning book titles…',
         stageSave: 'Saving locally…',
         cancel: 'Cancel',
+        thoughtsExpand: 'Show notes',
+        thoughtsCollapse: 'Hide notes',
+        thoughtColor: 'Note color',
         thoughtAdd: 'Note',
         thoughtPlaceholder: 'Write your thought…',
         thoughtSave: 'Save',

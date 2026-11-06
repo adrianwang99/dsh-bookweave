@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.12.0] - 2025-11-06
+
+- Thought text now supports six inks; each note stores its color and renders in it.
+- The floating toolbar replaces “Export” with an animated **Show/Hide notes** toggle: collapsing widens the reading column, hiding the side margin; a vertical bar in the note's color marks every annotated paragraph and expands the margin on click.
+- Export moved into the book-list toolbar so it is still one click away.
+
 ## [0.11.0] - 2025-11-06
 
 - Narrower reading column; the freed right margin is now a **thought margin** (边注): notes render in a handwriting font, aligned with the paragraph or excerpt they belong to.
