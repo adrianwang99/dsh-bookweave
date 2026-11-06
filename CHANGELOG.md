@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.17.0] - 2025-11-06
+
+- Fixed TOC parsing for Calibre-style EPUBs: chapters are now built from NCX/nav boundaries instead of one chapter per spine file. Spine files that are not TOC targets merge into the preceding chapter; part entries are flagged and styled in the TOC/guide.
+- Titles come from the TOC labels, so generic “第 N 章” fallbacks no longer replace real chapter names.
+- New `test/toc.mjs` regression suite (in-memory split EPUB).
+- Note: books imported before this version keep their old parsed structure; delete and re-import to rebuild the TOC.
+
 ## [0.16.0] - 2025-11-06
 
 - Added chapter translation: floating Translate menu (8 target languages),译文 rendered under each paragraph, cached per book/chapter/language.

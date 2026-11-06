@@ -4,7 +4,7 @@
   <p><strong>Read EPUBs inside DSH, discover every book they cite, and let an AI guide you through the chapters.</strong></p>
   <p>
     <a href="https://github.com/adrianwang99/dsh-bookweave/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green" /></a>
-    <img alt="Version" src="https://img.shields.io/badge/version-0.16.0-blue" />
+    <img alt="Version" src="https://img.shields.io/badge/version-0.17.0-blue" />
     <img alt="Platform" src="https://img.shields.io/badge/platform-DSH%20Web-7c5cff" />
     <img alt="Tests" src="https://img.shields.io/badge/tests-node--only-success" />
   </p>
@@ -20,7 +20,7 @@ BookWeave is a [DeepSeek Harness (DSH)](https://github.com/deepseek-ai/deepseek-
 | | |
 | --- | --- |
 | **Shelf** | Import `.epub` by click or drag & drop; 2:3 portrait covers extracted from the EPUB; book title, author and reading percentage only. |
-| **Reader** | Serif prose, adjustable font size, collapsible TOC, chapter navigation, remembered progress. No fixed header — the reading area and the right rail both start at the top of the window. |
+| **Reader** | Serif prose, adjustable font size, TOC built from the book's NCX/nav boundaries (Calibre-style split files merge into their chapter; parts are marked), chapter navigation, remembered progress. No fixed header — the reading area and the right rail both start at the top of the window. |
 | **Book list** | Extracts every book the current book mentions: 《》 titles, English “quoted title” cues and a curated lexicon, with noise filters (self-references, TOC, chapter headings, periodicals). Each entry links back to the paragraph where it appears. |
 | **Excerpts & notes** | Select text → red underline + excerpt card with an optional note. Every entry (excerpt or note) renders as the same action card — badge, chapter/time, text, and always-visible Locate / Note (excerpts) / Edit (notes) / Delete. Adding a thought automatically lists its source passage here too (older notes fall back to the current paragraph text). Locate is a real button; list text uses the system font (handwriting stays in the margin). |
 | **Margin notes** | The reading column is narrower; the freed right margin shows your thoughts in a **handwriting font**, anchored to the paragraph (or selection) they belong to. Pick one of six ink colors per note; the referenced text gets a **dashed underline in the same color** while notes are shown. Add from the selection toolbar or the “+” in the margin. The floating toolbar toggles notes with an animated collapse — when hidden, a colored vertical bar marks every annotated paragraph and expands them again on click. |
@@ -85,6 +85,8 @@ Restart DSH (⌘Q on macOS) after installing or updating the **Host** half (`ind
 6. Select text to create an excerpt (**Excerpts & notes** tab) or a thought (handwriting margin note); thoughts also appear in that tab with their source passage, and persist per book/chapter/paragraph.
 7. Translate: floating **Translate** → pick a language; translations render under paragraphs and are cached. Turn it off from the same menu.
 8. Book list → expand an entry to locate the mention or search the book in the built-in browser. The search URL is configurable (Book list → **Search source**, default Open Library).
+
+> **TOC note** — chapters are now built from the EPUB's NCX/nav TOC boundaries, not from every spine file. Books imported **before v0.17** keep the structure parsed at import time; delete and re-import them once to pick up the corrected TOC.
 
 ## AI analysis & privacy
 

@@ -17,6 +17,7 @@ Requires Node.js ≥ 20 (uses `Blob`, `Response`, `DecompressionStream`, `TextDe
 | --- | --- |
 | `run.mjs` | `openZip` / `parseEpub` on five synthetic fixtures, chapter/block shape, quote extraction (《》 + English cues + lexicon), markdown export, archive tolerance. |
 | `parse-archives.mjs` | Archive recovery and cover extraction on malformed / unusual archives. |
+| `toc.mjs` | TOC-driven chapter building on Calibre-style split EPUBs: NCX boundaries, part flags, non-TOC spine pages merged into the previous chapter. |
 | `structure.mjs` | Chapter structure heuristic (claims / evidence all carry valid paragraph positions), AI input compression budget, optional real-book smoke. |
 | `host.mjs` | Host AI route with a fake LLM stream: prompt budget, `maxTokens`, lowest reasoning effort, block-index validation, 403/502/503 branches. |
 

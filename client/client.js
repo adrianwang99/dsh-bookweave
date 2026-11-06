@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.16.0';
+    const CLIENT_VERSION = '0.17.0';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -362,15 +362,41 @@ window.__ModuleLoader__.load({
         const navMatch = /<nav\b[^>]*(?:epub:type|role)\s*=\s*["'][^"']*toc[^"']*["'][^>]*>([\s\S]*?)<\/nav>/i.exec(html);
         if (navMatch) scope = navMatch[1];
         const entries = [];
-        const anchorRe = /<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
+        let depth = 0;
+        let current = null;
+        const tokenRe = /<\/?ol\b[^>]*>|<\/?li\b[^>]*>|<a\b([^>]*)>([\s\S]*?)<\/a>/gi;
         let match;
-        while ((match = anchorRe.exec(scope))) {
+        while ((match = tokenRe.exec(scope))) {
+          const token = match[0];
+          if (/^<\/ol/i.test(token)) {
+            depth = Math.max(0, depth - 1);
+            current = null;
+            continue;
+          }
+          if (/^<ol/i.test(token)) {
+            if (current) current.part = true;
+            depth += 1;
+            continue;
+          }
+          if (/^<\/li/i.test(token)) {
+            current = null;
+            continue;
+          }
+          if (/^<li/i.test(token)) continue;
+          if (match[1] === undefined) continue;
           const href = getAttr('<x ' + match[1] + '>', 'href');
-          if (!href) continue;
           const label = stripTags(match[2]);
-          if (!label) continue;
+          if (!href || !label) continue;
           const resolved = resolvePath(navBase, href);
-          entries.push({ label, path: resolved.split('#')[0], fragment: href.split('#')[1] || '', rawHref: href });
+          const entry = {
+            label: label,
+            path: resolved.split('#')[0],
+            fragment: href.split('#')[1] || '',
+            depth: Math.max(0, depth - 1),
+            part: false,
+          };
+          entries.push(entry);
+          current = entry;
         }
         return entries;
       }
@@ -378,23 +404,32 @@ window.__ModuleLoader__.load({
       function parseNcx(xml, ncxPath) {
         const base = dirOf(ncxPath);
         const entries = [];
-        let label = '';
-        const tokenRe = /<(text|content)\b([^>]*)>([\s\S]*?)<\/\1>|<content\b([^>]*?)\/?>/gi;
+        const stack = [];
+        const tokenRe = /<\/?navPoint\b[^>]*>|<text\b[^>]*>([\s\S]*?)<\/text>|<content\b[^>]*>/gi;
         let match;
         while ((match = tokenRe.exec(xml))) {
-          if (match[1] === 'text') {
-            label = stripTags(match[3]);
-          } else {
-            const tag = '<x ' + (match[1] === 'content' ? match[2] : match[4]) + '>';
-            const src = getAttr(tag, 'src');
-            if (!src) continue;
-            entries.push({
-              label: label || '',
-              path: resolvePath(base, src).split('#')[0],
-              fragment: src.split('#')[1] || '',
-              rawHref: src,
-            });
-            label = '';
+          const token = match[0];
+          if (/^<\/navPoint/i.test(token)) {
+            const entry = stack.pop();
+            if (entry && stack.length) stack[stack.length - 1].part = true;
+            continue;
+          }
+          if (/^<navPoint/i.test(token)) {
+            const entry = { label: '', path: '', fragment: '', depth: stack.length, part: false };
+            stack.push(entry);
+            entries.push(entry);
+            continue;
+          }
+          if (match[1] !== undefined) {
+            const current = stack[stack.length - 1];
+            if (current) current.label = stripTags(match[1]);
+            continue;
+          }
+          const current = stack[stack.length - 1];
+          const src = getAttr(token, 'src');
+          if (current && src) {
+            current.path = resolvePath(base, src).split('#')[0];
+            current.fragment = src.split('#')[1] || '';
           }
         }
         return entries.filter((entry) => entry.path);
@@ -599,7 +634,7 @@ window.__ModuleLoader__.load({
         if (!spineItems.length) throw new Error('这本 EPUB 里没有可阅读的正文文件');
 
         onStage('chapters', 0.15);
-        const chapters = [];
+        const docs = [];
         for (let index = 0; index < spineItems.length; index++) {
           const item = spineItems[index];
           let html = '';
@@ -610,20 +645,12 @@ window.__ModuleLoader__.load({
           }
           const parsed = htmlToBlocks(html);
           if (!parsed.blocks.length) continue;
-          chapters.push({
-            index: chapters.length,
-            path: item.path,
-            href: item.href,
-            title: '',
-            docTitle: parsed.title,
-            blocks: parsed.blocks,
-            chars: parsed.blocks.reduce((sum, block) => sum + block.text.length, 0),
-          });
+          docs.push({ spineIndex: index, path: item.path, href: item.href, docTitle: parsed.title || '', blocks: parsed.blocks });
           if (index % 8 === 0) onStage('chapters', 0.15 + 0.35 * (index / spineItems.length));
         }
-        if (!chapters.length) throw new Error('这本 EPUB 的正文为空');
+        if (!docs.length) throw new Error('这本 EPUB 的正文为空');
 
-        // TOC：EPUB3 nav → NCX → 章节标题 → 章节序号
+        // TOC：EPUB3 nav → NCX
         let toc = [];
         const navItem = Array.from(manifest.values()).find((item) => /(^|\s)nav(\s|$)/.test(item.properties || ''));
         const ncxItem = Array.from(manifest.values()).find(
@@ -645,36 +672,85 @@ window.__ModuleLoader__.load({
             toc = [];
           }
         }
-        const chapterByPath = new Map();
-        for (const chapter of chapters) chapterByPath.set(chapter.path, chapter);
-        const tocEntries = [];
+
+        const pathToSpine = new Map();
+        for (const doc of docs) {
+          if (!pathToSpine.has(doc.path)) pathToSpine.set(doc.path, doc.spineIndex);
+        }
+        const boundaries = [];
+        const seenSpine = new Set();
         for (const entry of toc) {
-          const chapter = chapterByPath.get(entry.path);
-          if (!chapter) continue;
-          tocEntries.push({
-            label: entry.label || chapter.docTitle || '',
-            chapterIndex: chapter.index,
+          const spineIndex = pathToSpine.get(entry.path);
+          if (spineIndex === undefined || seenSpine.has(spineIndex)) continue;
+          seenSpine.add(spineIndex);
+          boundaries.push({
+            spineIndex: spineIndex,
+            label: entry.label || '',
             fragment: entry.fragment || '',
+            depth: entry.depth || 0,
+            part: Boolean(entry.part),
           });
         }
-        for (const entry of tocEntries) {
-          const chapter = chapters[entry.chapterIndex];
-          if (!entry.label) continue;
-          if (!chapter.title || chapter.title === chapter.docTitle) chapter.title = entry.label;
-        }
-        for (const chapter of chapters) {
-          if (!chapter.title) {
-            const docTitle = (chapter.docTitle || '').trim();
+        boundaries.sort((a, b) => a.spineIndex - b.spineIndex);
+
+        const chapters = [];
+        const tocEntries = [];
+        const pushChapter = (rangeStart, rangeEnd, meta) => {
+          const slice = docs.filter((doc) => doc.spineIndex >= rangeStart && doc.spineIndex < rangeEnd);
+          if (!slice.length) return null;
+          const blocks = [];
+          for (const doc of slice) for (const block of doc.blocks) blocks.push(block);
+          if (!blocks.length) return null;
+          const chapter = {
+            index: chapters.length,
+            path: slice[0].path,
+            href: slice[0].href,
+            title: (meta && meta.title) || '',
+            part: Boolean(meta && meta.part),
+            depth: (meta && meta.depth) || 0,
+            blocks: blocks,
+            chars: blocks.reduce((sum, block) => sum + block.text.length, 0),
+          };
+          chapters.push(chapter);
+          return chapter;
+        };
+
+        if (boundaries.length >= 2) {
+          for (let i = 0; i < boundaries.length; i++) {
+            const boundary = boundaries[i];
+            const rangeStart = i === 0 ? 0 : boundary.spineIndex;
+            const rangeEnd = i + 1 < boundaries.length ? boundaries[i + 1].spineIndex : docs[docs.length - 1].spineIndex + 1;
+            const chapter = pushChapter(rangeStart, rangeEnd, { title: boundary.label, part: boundary.part, depth: boundary.depth });
+            if (!chapter) continue;
+            let title = boundary.label;
+            if (!title) {
+              const docTitle = String(chapter.title || '').trim();
+              title = docTitle && docTitle !== meta.title ? docTitle : '第 ' + (chapter.index + 1) + ' 章';
+              chapter.title = title;
+            }
+            tocEntries.push({
+              label: chapter.title,
+              chapterIndex: chapter.index,
+              fragment: boundary.fragment,
+              depth: boundary.depth,
+              part: Boolean(boundary.part),
+            });
+          }
+        } else {
+          for (const doc of docs) {
+            const chapter = pushChapter(doc.spineIndex, doc.spineIndex + 1, {});
+            if (!chapter) continue;
+            const docTitle = String(doc.docTitle || '').trim();
             const usableDoc = docTitle && docTitle !== meta.title && !/^(untitled|unknown|无标题|未命名)$/i.test(docTitle);
             if (usableDoc) chapter.title = docTitle;
+            if (!chapter.title) {
+              const heading = chapter.blocks.find((block) => block.type.startsWith('h')) || null;
+              if (heading && heading.text.length <= 60) chapter.title = heading.text;
+            }
+            if (!chapter.title) chapter.title = '第 ' + (chapter.index + 1) + ' 章';
           }
-          if (!chapter.title) {
-            const heading = chapter.blocks.find((block) => block.type.startsWith('h')) || null;
-            if (heading && heading.text.length <= 60) chapter.title = heading.text;
-          }
-          if (!chapter.title) chapter.title = '第 ' + (chapter.index + 1) + ' 章';
-          delete chapter.docTitle;
         }
+        if (!chapters.length) throw new Error('这本 EPUB 的正文为空');
 
         onStage('done', 0.5);
         const chars = chapters.reduce((sum, chapter) => sum + chapter.chars, 0);
@@ -1966,6 +2042,7 @@ window.__ModuleLoader__.load({
       '.bw-toc__item{width:100%;text-align:left;font:inherit;font-size:12.5px;line-height:1.5;color:var(--dsw-alias-label-primary);background:transparent;border:0;border-radius:7px;padding:7px 8px;display:flex;gap:6px;align-items:flex-start;cursor:pointer}',
       '.bw-toc__item:hover{background:var(--dsw-alias-bg-layer-2)}',
       '.bw-toc__item--active{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-brand-primary);font-weight:650}',
+      '.bw-toc__item--part{font-weight:650;color:var(--dsw-alias-label-primary);background:color-mix(in srgb,var(--dsw-alias-bg-layer-2) 55%,transparent)}',
       '.bw-toc__item:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.bw-toc__label{flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}',
       '.bw-toc__dot{flex:none;font-size:10.5px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums;padding-top:1px}',
@@ -2207,6 +2284,7 @@ window.__ModuleLoader__.load({
       '.bw-guide__item:hover{background:var(--dsw-alias-bg-layer-2)}',
       '.bw-guide__item:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px}',
       '.bw-guide__item--active{color:var(--dsw-alias-brand-primary);font-weight:650}',
+      '.bw-guide__item--part{font-weight:650;color:var(--dsw-alias-label-primary)}',
       '.bw-guide__itemnum{flex:none;width:16px;font-size:10px;color:var(--dsw-alias-label-secondary);text-align:center}',
       '.bw-guide__itemtitle{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.bw-guide__itemcount{flex:none;font-size:10px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
@@ -4350,7 +4428,7 @@ window.__ModuleLoader__.load({
                         type: 'button',
                         role: 'option',
                         'aria-selected': chapter.index === current.index ? 'true' : 'false',
-                        className: cx('bw-guide__item', chapter.index === current.index && 'bw-guide__item--active'),
+                        className: cx('bw-guide__item', chapter.part && 'bw-guide__item--part', chapter.index === current.index && 'bw-guide__item--active'),
                         onClick: () => {
                           props.onSelectChapter(chapter.index);
                           closeMenuNow();
@@ -4494,7 +4572,7 @@ window.__ModuleLoader__.load({
               {
                 key: index,
                 type: 'button',
-                className: cx('bw-toc__item', index === props.chapterIndex && 'bw-toc__item--active'),
+                className: cx('bw-toc__item', chapter.part && 'bw-toc__item--part', index === props.chapterIndex && 'bw-toc__item--active'),
                 onClick: () => props.onSelect(index),
                 'aria-current': index === props.chapterIndex ? 'true' : undefined,
               },

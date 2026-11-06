@@ -29,6 +29,9 @@ jobs:
       - name: Structure suite
         run: node test/structure.mjs
 
+      - name: TOC suite
+        run: node test/toc.mjs
+
       - name: Search template suite
         run: node test/search.mjs
 
