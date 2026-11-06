@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.18.0] - 2025-11-06
+
+- Shelf categories: left sidebar with All / Uncategorized / custom categories, create, rename and delete; each book cover has a category picker; clicking a category filters the shelf.
+- Folder import: **Import folder** picks a directory and imports every EPUB under it recursively (duplicates skipped), assigning new books to the active category when one is selected.
+- Category storage uses the new `categories` IndexedDB store (DB v6); book summaries carry `categoryId`.
+
 ## [0.17.0] - 2025-11-06
 
 - Fixed TOC parsing for Calibre-style EPUBs: chapters are now built from NCX/nav boundaries instead of one chapter per spine file. Spine files that are not TOC targets merge into the preceding chapter; part entries are flagged and styled in the TOC/guide.

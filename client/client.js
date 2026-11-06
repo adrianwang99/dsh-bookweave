@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.17.0';
+    const CLIENT_VERSION = '0.18.0';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -1502,7 +1502,7 @@ window.__ModuleLoader__.load({
 
     // ---- 本机存储（IndexedDB：books 存正文，index 存书架摘要）--------------
     const DB_NAME = 'dsh-bookweave';
-    const DB_VERSION = 5;
+    const DB_VERSION = 6;
     let dbPromise = null;
     // IndexedDB 不可用时的会话内兜底：书签式存储失败仍然能读，只是刷新后需要重新导入。
     const memoryBooks = new Map();
@@ -1510,6 +1510,7 @@ window.__ModuleLoader__.load({
     const memoryExcerpts = new Map();
     const memoryThoughts = new Map();
     const memoryTranslations = new Map();
+    const memoryCategories = new Map();
     const memoryInsights = new Map();
     let idbDown = false;
 
@@ -1546,6 +1547,7 @@ window.__ModuleLoader__.load({
           if (!db.objectStoreNames.contains('insights')) db.createObjectStore('insights', { keyPath: 'key' });
           if (!db.objectStoreNames.contains('thoughts')) db.createObjectStore('thoughts', { keyPath: 'bookId' });
           if (!db.objectStoreNames.contains('translations')) db.createObjectStore('translations', { keyPath: 'key' });
+          if (!db.objectStoreNames.contains('categories')) db.createObjectStore('categories', { keyPath: 'id' });
         };
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => {
@@ -1671,6 +1673,49 @@ window.__ModuleLoader__.load({
       } catch (error) {
         markIdbDown();
         return local || [];
+      }
+    }
+
+    async function dbListCategories() {
+      if (idbDown) return Array.from(memoryCategories.values());
+      try {
+        const db = await openDatabase();
+        const tx = db.transaction('categories', 'readonly');
+        const items = await idbRequest(tx.objectStore('categories').getAll());
+        return (items || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+      } catch (error) {
+        markIdbDown();
+        return Array.from(memoryCategories.values());
+      }
+    }
+
+    async function dbSaveCategory(category) {
+      memoryCategories.set(category.id, category);
+      if (idbDown) return false;
+      try {
+        const db = await openDatabase();
+        await runTransaction(db, 'categories', 'readwrite', (tx) => {
+          tx.objectStore('categories').put(category);
+        });
+        return true;
+      } catch (error) {
+        markIdbDown();
+        return false;
+      }
+    }
+
+    async function dbDeleteCategory(id) {
+      memoryCategories.delete(id);
+      if (idbDown) return false;
+      try {
+        const db = await openDatabase();
+        await runTransaction(db, 'categories', 'readwrite', (tx) => {
+          tx.objectStore('categories').delete(id);
+        });
+        return true;
+      } catch (error) {
+        markIdbDown();
+        return false;
       }
     }
 
@@ -1937,6 +1982,7 @@ window.__ModuleLoader__.load({
         bookCount: record.mentions.books.filter((item) => item.kind !== 'article').length,
         articleCount: record.mentions.books.filter((item) => item.kind === 'article').length,
         mentionCount: record.mentions.stats.occurrences,
+        categoryId: record.categoryId || '',
         progress: record.progress,
       };
     }
@@ -2017,6 +2063,33 @@ window.__ModuleLoader__.load({
       '.bw-section-head h2{font-size:13.5px;font-weight:650;margin:0;line-height:1.4}',
       '.bw-section-head span{font-size:11.5px;color:var(--dsw-alias-label-secondary)}',
       '.bw-library{flex:1 1 auto;min-height:0;overflow:auto;padding-right:2px}',
+      '.bw-main--lib{flex-direction:row;align-items:flex-start;gap:14px}',
+      '.bw-lib{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}',
+      '.bw-cats{flex:0 0 190px;min-width:0;display:flex;flex-direction:column;gap:8px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);padding:10px}',
+      '.bw-cats__head{font-size:11px;font-weight:650;color:var(--dsw-alias-label-secondary);letter-spacing:.03em;padding:2px 4px 2px}',
+      '.bw-cats__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}',
+      '.bw-cats__row{display:flex;align-items:center;gap:2px;border-radius:7px}',
+      '.bw-cats__row:hover{background:var(--dsw-alias-bg-layer-2)}',
+      '.bw-cats__row--active{background:var(--dsw-alias-bg-layer-2)}',
+      '.bw-cats__row--active .bw-cats__btn{color:var(--dsw-alias-brand-primary);font-weight:650}',
+      '.bw-cats__btn{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:6px;font:inherit;font-size:12px;text-align:left;padding:6px 7px;background:none;border:0;border-radius:7px;color:var(--dsw-alias-label-primary);cursor:pointer}',
+      '.bw-cats__name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.bw-cats__count{flex:none;font-size:10.5px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
+      '.bw-cats__actions{display:flex;gap:0;opacity:0;transition:opacity .12s;padding-right:3px}',
+      '.bw-cats__row:hover .bw-cats__actions{opacity:1}',
+      '.bw-cats__mini{font:inherit;font-size:11px;padding:2px 5px;background:none;border:0;color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:5px}',
+      '.bw-cats__mini:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-layer-1)}',
+      '.bw-cats__new{display:flex;gap:4px;align-items:center}',
+      '.bw-cats__input{flex:1 1 auto;min-width:0;height:26px;font:inherit;font-size:11.5px;padding:0 7px;border-radius:6px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary)}',
+      '.bw-cats__add{font:inherit;font-size:11px;text-align:left;padding:5px 7px;border:1px dashed var(--dsw-alias-border-l2);border-radius:7px;background:none;color:var(--dsw-alias-label-secondary);cursor:pointer}',
+      '.bw-cats__add:hover{color:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}',
+      '.bw-card__cat{position:relative;margin-top:2px;display:flex}',
+      '.bw-card__catbtn{font:inherit;font-size:10.5px;padding:2px 7px;border-radius:99px;border:1px dashed var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.bw-card__catbtn:hover{color:var(--dsw-alias-label-primary);border-color:var(--dsw-alias-brand-primary)}',
+      '.bw-card__catmenu{position:absolute;left:0;bottom:calc(100% + 4px);z-index:30;min-width:140px;max-height:200px;overflow:auto;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.2);padding:4px;display:flex;flex-direction:column;gap:2px}',
+      '.bw-card__catopt{font:inherit;font-size:11.5px;text-align:left;padding:5px 7px;border:0;border-radius:6px;background:none;color:var(--dsw-alias-label-primary);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.bw-card__catopt:hover{background:var(--dsw-alias-bg-layer-2)}',
+      '@container (max-width:760px){.bw-main--lib{flex-direction:column}.bw-cats{flex:1 1 auto;width:100%}}',
       '.bw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,168px));gap:12px;padding-bottom:10px}',
       '.bw-card{position:relative;display:flex;flex-direction:column;gap:6px;text-align:left;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);',
       'border-radius:12px;padding:10px;cursor:pointer;font:inherit;color:inherit;transition:border-color .15s,transform .15s}',
@@ -2806,7 +2879,15 @@ window.__ModuleLoader__.load({
       const [toast, setToast] = React.useState('');
       const [openingId, setOpeningId] = React.useState('');
       const [deleteId, setDeleteId] = React.useState('');
+      const [categories, setCategories] = React.useState([]);
+      const [activeCategory, setActiveCategory] = React.useState('all');
+      const [creatingCategory, setCreatingCategory] = React.useState(false);
+      const [categoryDraft, setCategoryDraft] = React.useState('');
+      const [renamingCategory, setRenamingCategory] = React.useState('');
+      const [renameDraft, setRenameDraft] = React.useState('');
+      const [categoryMenuId, setCategoryMenuId] = React.useState('');
       const inputRef = React.useRef(null);
+      const folderRef = React.useRef(null);
       const rootRef = React.useRef(null);
       const progressRef = React.useRef(null);
       const progressTimerRef = React.useRef(null);
@@ -2837,10 +2918,11 @@ window.__ModuleLoader__.load({
 
       React.useEffect(() => {
         aliveRef.current = true;
-        dbList()
-          .then((items) => {
+        Promise.all([dbList(), dbListCategories()])
+          .then(([items, cats]) => {
             if (!aliveRef.current) return;
             setLibrary(items);
+            setCategories(cats || []);
             setReady(true);
           })
           .catch((cause) => {
@@ -2895,15 +2977,9 @@ window.__ModuleLoader__.load({
         }
       }
 
-      async function importFiles(fileList) {
-        if (busy) return;
-        const files = Array.prototype.slice.call(fileList || []).filter(Boolean);
-        if (!files.length) {
-          setError(t('notEpub'));
-          notify(t('notEpub'));
-          return;
-        }
-        const file = files[0];
+      async function importBookFile(file, options) {
+        const opts = options || {};
+        if (!file) return false;
         // 不再按扩展名先拒：让解析器给出真实原因（不是 EPUB / 损坏 / DRM 都有明确提示）
         const looksEpub = /\.epub$/i.test(file.name || '') || /epub/i.test(file.type || '');
         if (!looksEpub && typeof console !== 'undefined' && console.warn) {
@@ -2912,7 +2988,7 @@ window.__ModuleLoader__.load({
         if (file.size > 220 * 1024 * 1024) {
           setError(t('fileTooBig'));
           notify(t('fileTooBig'));
-          return;
+          return false;
         }
         setError('');
         setBusy({ title: file.name, stage: t('stageUnzip'), ratio: 0.02 });
@@ -2921,10 +2997,14 @@ window.__ModuleLoader__.load({
           const id = hashBytes(bytes);
           const existing = library.find((item) => item.id === id);
           if (existing && existing.cover) {
+            if (opts.categoryId && existing.categoryId !== opts.categoryId) {
+              await dbSaveSummary(id, { categoryId: opts.categoryId });
+              setLibrary((current) => current.map((item) => (item.id === id ? Object.assign({}, item, { categoryId: opts.categoryId }) : item)));
+            }
             setBusy(null);
             notify(t('alreadyImported'));
-            await openBook(id);
-            return;
+            if (opts.openBook !== false) await openBook(id);
+            return false;
           }
           const parsed = await Core.parseEpub(bytes, {
             onStage: (stage, ratio) => {
@@ -2945,9 +3025,13 @@ window.__ModuleLoader__.load({
             } else {
               notify(t('alreadyImported'));
             }
+            if (opts.categoryId && existing.categoryId !== opts.categoryId) {
+              await dbSaveSummary(id, { categoryId: opts.categoryId });
+              setLibrary((current) => current.map((item) => (item.id === id ? Object.assign({}, item, { categoryId: opts.categoryId }) : item)));
+            }
             setBusy(null);
-            await openBook(id);
-            return;
+            if (opts.openBook !== false) await openBook(id);
+            return false;
           }
           setBusy({ title: file.name, stage: t('stageExtract'), ratio: 0.72 });
           await new Promise((resolve) => window.setTimeout(resolve, 0));
@@ -2955,6 +3039,7 @@ window.__ModuleLoader__.load({
           const now = Date.now();
           const nextRecord = {
             version: 1,
+            categoryId: opts.categoryId || '',
             id,
             name: file.name,
             size: bytes.length,
@@ -2972,26 +3057,101 @@ window.__ModuleLoader__.load({
           const persisted = await dbPut(nextRecord, summary);
           if (!aliveRef.current) return;
           setLibrary((current) => [summary].concat(current.filter((item) => item.id !== id)));
-          setRecord(nextRecord);
-          setView('reader');
+          if (opts.openBook !== false) {
+            setRecord(nextRecord);
+            setView('reader');
+          }
           setBusy(null);
           if (!persisted) notify(t('idbError'));
-          else {
+          else if (opts.openBook !== false) {
             const found = mentions.books.filter((item) => item.kind !== 'article').length;
             notify(t('importDone').replace('{count}', String(found)));
           }
+          return true;
         } catch (cause) {
-          if (!aliveRef.current) return;
+          if (!aliveRef.current) return false;
           setBusy(null);
           const message = friendlyError(cause, t);
           setError(message);
           notify(message);
           if (typeof console !== 'undefined' && console.error) console.error('[dsh-bookweave] import failed', cause);
+          return false;
         }
+      }
+
+      async function importFiles(fileList) {
+        const files = Array.prototype.slice.call(fileList || []).filter(Boolean);
+        if (!files.length) {
+          setError(t('notEpub'));
+          notify(t('notEpub'));
+          return;
+        }
+        await importBookFile(files[0], { openBook: true });
+      }
+
+      async function importFolder(fileList) {
+        const files = Array.prototype.slice.call(fileList || []).filter((file) => /\.epub$/i.test(file.name || ''));
+        if (!files.length) {
+          notify(t('folderNoEpub'));
+          return;
+        }
+        const categoryId = activeCategory !== 'all' && activeCategory !== 'uncategorized' ? activeCategory : '';
+        let imported = 0;
+        for (const file of files) {
+          setBusy({ title: file.name, stage: t('stageUnzip'), ratio: 0.02 });
+          const ok = await importBookFile(file, { openBook: false, categoryId: categoryId });
+          if (ok) imported += 1;
+        }
+        setBusy(null);
+        notify(t('folderImported').replace('{count}', String(imported)));
       }
 
       function pickFile() {
         if (inputRef.current) inputRef.current.click();
+      }
+
+      function pickFolder() {
+        if (folderRef.current) folderRef.current.click();
+      }
+
+      async function createCategory() {
+        const name = categoryDraft.trim();
+        if (!name) {
+          setCreatingCategory(false);
+          setCategoryDraft('');
+          return;
+        }
+        const category = { id: 'cat-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), name: name, order: Date.now() };
+        await dbSaveCategory(category);
+        setCategories((current) => current.concat([category]));
+        setCategoryDraft('');
+        setCreatingCategory(false);
+        setActiveCategory(category.id);
+      }
+
+      async function saveRenameCategory(id) {
+        const name = renameDraft.trim();
+        if (name) {
+          await dbSaveCategory({ id: id, name: name, order: Date.now() });
+          setCategories((current) => current.map((cat) => (cat.id === id ? Object.assign({}, cat, { name: name }) : cat)));
+        }
+        setRenamingCategory('');
+        setRenameDraft('');
+      }
+
+      async function removeCategory(id) {
+        await dbDeleteCategory(id);
+        setCategories((current) => current.filter((cat) => cat.id !== id));
+        const affected = library.filter((item) => item.categoryId === id);
+        for (const item of affected) await dbSaveSummary(item.id, { categoryId: '' });
+        setLibrary((current) => current.map((item) => (item.categoryId === id ? Object.assign({}, item, { categoryId: '' }) : item)));
+        if (activeCategory === id) setActiveCategory('all');
+      }
+
+      async function assignCategory(bookId, categoryId) {
+        await dbSaveSummary(bookId, { categoryId: categoryId || '' });
+        setLibrary((current) => current.map((item) => (item.id === bookId ? Object.assign({}, item, { categoryId: categoryId || '' }) : item)));
+        setCategoryMenuId('');
       }
 
       async function removeBook(id) {
@@ -3112,6 +3272,144 @@ window.__ModuleLoader__.load({
         };
       }, [view]);
 
+      const visibleBooks = library.filter((item) =>
+        activeCategory === 'all' ? true : activeCategory === 'uncategorized' ? !item.categoryId : item.categoryId === activeCategory
+      );
+      const activeCategoryName =
+        activeCategory === 'all'
+          ? t('categoryAll')
+          : activeCategory === 'uncategorized'
+            ? t('categoryUncategorized')
+            : ((categories.find((cat) => cat.id === activeCategory) || {}).name || t('categoryAll'));
+      const countFor = (id) => (id === 'all' ? library.length : id === 'uncategorized' ? library.filter((item) => !item.categoryId).length : library.filter((item) => item.categoryId === id).length);
+
+      function categoryRow(id, name) {
+        const active = activeCategory === id;
+        if (renamingCategory === id) {
+          return h(
+            'div',
+            { className: 'bw-cats__rename' },
+            h('input', {
+              className: 'bw-cats__input',
+              value: renameDraft,
+              autoFocus: true,
+              onChange: (event) => setRenameDraft(event.target.value),
+              onKeyDown: (event) => {
+                if (event.key === 'Enter') saveRenameCategory(id);
+                if (event.key === 'Escape') {
+                  setRenamingCategory('');
+                  setRenameDraft('');
+                }
+              },
+            }),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'bw-cats__mini',
+                onClick: () => saveRenameCategory(id),
+              },
+              t('categorySave')
+            )
+          );
+        }
+        return h(
+          'div',
+          { className: cx('bw-cats__row', active && 'bw-cats__row--active') },
+          h(
+            'button',
+            {
+              type: 'button',
+              className: 'bw-cats__btn',
+              onClick: () => setActiveCategory(id),
+              'aria-current': active ? 'page' : undefined,
+            },
+            h('span', { className: 'bw-cats__name' }, name),
+            h('span', { className: 'bw-cats__count' }, String(countFor(id)))
+          ),
+          id !== 'all' && id !== 'uncategorized'
+            ? h(
+                'div',
+                { className: 'bw-cats__actions' },
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'bw-cats__mini',
+                    onClick: (event) => {
+                      event.stopPropagation();
+                      setRenamingCategory(id);
+                      setRenameDraft(name);
+                    },
+                    'aria-label': t('categoryRename'),
+                  },
+                  '✎'
+                ),
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'bw-cats__mini',
+                    onClick: (event) => {
+                      event.stopPropagation();
+                      removeCategory(id);
+                    },
+                    'aria-label': t('categoryDelete'),
+                  },
+                  '×'
+                )
+              )
+            : null
+        );
+      }
+
+      function categorySidebar() {
+        return h(
+          'aside',
+          { className: 'bw-cats', 'aria-label': t('categories') },
+          h('div', { className: 'bw-cats__head' }, t('categories')),
+          h(
+            'ul',
+            { className: 'bw-cats__list' },
+            h('li', null, categoryRow('all', t('categoryAll'))),
+            h('li', null, categoryRow('uncategorized', t('categoryUncategorized'))),
+            categories.map((cat) => h('li', { key: cat.id }, categoryRow(cat.id, cat.name)))
+          ),
+          creatingCategory
+            ? h(
+                'div',
+                { className: 'bw-cats__new' },
+                h('input', {
+                  className: 'bw-cats__input',
+                  value: categoryDraft,
+                  autoFocus: true,
+                  placeholder: t('categoryNamePlaceholder'),
+                  onChange: (event) => setCategoryDraft(event.target.value),
+                  onKeyDown: (event) => {
+                    if (event.key === 'Enter') createCategory();
+                    if (event.key === 'Escape') {
+                      setCreatingCategory(false);
+                      setCategoryDraft('');
+                    }
+                  },
+                }),
+                h('button', { type: 'button', className: 'bw-cats__mini', onClick: createCategory }, t('categorySave'))
+              )
+            : h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'bw-cats__add',
+                  onClick: () => {
+                    setCreatingCategory(true);
+                    setCategoryDraft('');
+                  },
+                },
+                '+ ' + t('categoryNew')
+              )
+        );
+      }
+
       const reader =
         view === 'reader' && record
           ? h(ReaderView, {
@@ -3161,6 +3459,21 @@ window.__ModuleLoader__.load({
             },
           }
         ),
+        h('input', {
+          ref: folderRef,
+          type: 'file',
+          webkitdirectory: 'true',
+          directory: '',
+          multiple: true,
+          className: 'bw-sr',
+          tabIndex: -1,
+          'aria-hidden': 'true',
+          onChange: (event) => {
+            const picked = event.target.files ? Array.prototype.slice.call(event.target.files) : [];
+            event.target.value = '';
+            importFolder(picked);
+          },
+        }),
         error
           ? h('div', { style: { padding: '0 20px 8px' } }, h(ErrorBanner, { t: t, message: error, onDismiss: () => setError('') }))
           : null,
@@ -3191,12 +3504,21 @@ window.__ModuleLoader__.load({
                   { type: 'button', className: 'bw-btn bw-btn--primary', onClick: pickFile, disabled: Boolean(busy) },
                   h('span', { 'aria-hidden': 'true' }, '＋'),
                   t('import')
+                ),
+                h(
+                  'button',
+                  { type: 'button', className: 'bw-btn bw-btn--ghost bw-btn--sm', onClick: pickFolder, disabled: Boolean(busy) },
+                  t('importFolder')
                 )
               )
             ),
             h(
               'main',
-              { className: 'bw-main' },
+              { className: 'bw-main bw-main--lib' },
+              categorySidebar(),
+              h(
+              'div',
+              { className: 'bw-lib' },
               library.length === 0
                 ? h(
                     'section',
@@ -3222,21 +3544,22 @@ window.__ModuleLoader__.load({
               h(
                 'div',
                 { className: 'bw-section-head', style: library.length === 0 ? { marginTop: 12 } : undefined },
-                h('h2', null, t('library')),
-                h('span', null, ready ? t('libraryMeta').replace('{books}', String(library.length)).replace('{mentions}', String(library.reduce((sum, item) => sum + (item.mentionCount || 0), 0))) : t('loading'))
+                h('h2', null, activeCategoryName),
+                h('span', null, ready ? t('libraryMeta').replace('{books}', String(visibleBooks.length)).replace('{mentions}', String(visibleBooks.reduce((sum, item) => sum + (item.mentionCount || 0), 0))) : t('loading'))
               ),
               h(
                 'div',
                 { className: 'bw-library' },
-                library.length
+                visibleBooks.length
                   ? h(
                       'div',
                       { className: 'bw-grid' },
-                      library.map((item) =>
+                      visibleBooks.map((item) =>
                         h(BookCard, {
                           key: item.id,
                           t: t,
                           item: item,
+                          categories: categories,
                           opening: openingId === item.id,
                           deleting: deleteId === item.id,
                           onOpen: () => openBook(item.id),
@@ -3244,10 +3567,17 @@ window.__ModuleLoader__.load({
                             event.stopPropagation();
                             removeBook(item.id);
                           },
+                          onCategory: assignCategory,
                         })
                       )
                     )
-                  : h('div', { className: 'bw-empty' }, h('div', { className: 'bw-empty__title' }, t('libraryEmptyTitle')), h('div', null, t('libraryEmptyText')))
+                  : h(
+                      'div',
+                      { className: 'bw-empty' },
+                      h('div', { className: 'bw-empty__title' }, library.length ? t('categoryEmptyTitle') : t('libraryEmptyTitle')),
+                      h('div', null, library.length ? t('categoryEmptyText') : t('libraryEmptyText'))
+                    )
+              ),
               ),
               h('div', { className: 'bw-version' }, '书脉 BookWeave v' + CLIENT_VERSION)
             )
@@ -3286,6 +3616,9 @@ window.__ModuleLoader__.load({
     function BookCard(props) {
       const t = props.t;
       const item = props.item;
+      const categories = props.categories || [];
+      const [catMenuOpen, setCatMenuOpen] = React.useState(false);
+      const currentCategory = categories.find((cat) => cat.id === item.categoryId) || null;
       const color = coverColor(item.title || item.name || '');
       const percent = item.progress && item.chapterCount
         ? Math.max(0, Math.min(100, Math.round((((item.progress.chapterIndex || 0) + (item.progress.ratio || 0)) / Math.max(1, item.chapterCount)) * 100)))
@@ -3321,6 +3654,60 @@ window.__ModuleLoader__.load({
         h('div', { className: 'bw-card__title' }, item.title || t('untitled')),
         h('div', { className: 'bw-card__author' }, item.author || t('unknownAuthor')),
         h('div', { className: 'bw-card__progress' }, t('progressMeta').replace('{percent}', String(percent))),
+        props.onCategory
+          ? h(
+              'div',
+              { className: 'bw-card__cat' },
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'bw-card__catbtn',
+                  onClick: (event) => {
+                    event.stopPropagation();
+                    setCatMenuOpen((value) => !value);
+                  },
+                  'aria-expanded': catMenuOpen,
+                },
+                currentCategory ? currentCategory.name : t('categoryUncategorized')
+              ),
+              catMenuOpen
+                ? h(
+                    'div',
+                    { className: 'bw-card__catmenu', role: 'menu' },
+                    h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'bw-card__catopt',
+                        onClick: (event) => {
+                          event.stopPropagation();
+                          props.onCategory(item.id, '');
+                          setCatMenuOpen(false);
+                        },
+                      },
+                      t('categoryUncategorized')
+                    ),
+                    categories.map((cat) =>
+                      h(
+                        'button',
+                        {
+                          key: cat.id,
+                          type: 'button',
+                          className: 'bw-card__catopt',
+                          onClick: (event) => {
+                            event.stopPropagation();
+                            props.onCategory(item.id, cat.id);
+                            setCatMenuOpen(false);
+                          },
+                        },
+                        cat.name
+                      )
+                    )
+                  )
+                : null
+            )
+          : null,
         h(
           'button',
           {
@@ -4936,6 +5323,19 @@ window.__ModuleLoader__.load({
         feature2Text: '按提及次数排序，保留原文摘录，可一键定位回原书位置。',
         feature3Title: '关系网络',
         feature3Text: '同一段落提到的书会被连成一本书的知识网络，可导出 Markdown 书单。',
+        categories: '分类',
+        categoryAll: '全部',
+        categoryUncategorized: '未分类',
+        categoryNew: '新建分类',
+        categoryNamePlaceholder: '分类名称',
+        categorySave: '保存',
+        categoryRename: '重命名',
+        categoryDelete: '删除分类',
+        categoryEmptyTitle: '这个分类还没有书',
+        categoryEmptyText: '在书封面上点分类按钮，把书移动到这里。',
+        importFolder: '导入文件夹',
+        folderNoEpub: '文件夹里没有 EPUB 文件',
+        folderImported: '已从文件夹导入 {count} 本',
         library: '我的书架',
         libraryMeta: '{books} 本书 · {mentions} 次提及',
         loading: '正在读取…',
@@ -5128,6 +5528,19 @@ window.__ModuleLoader__.load({
         feature2Text: 'Sorted by mentions with original snippets and one-click jump back to the text.',
         feature3Title: 'See the network',
         feature3Text: 'Books mentioned in the same paragraph get linked; export the list as Markdown.',
+        categories: 'Categories',
+        categoryAll: 'All books',
+        categoryUncategorized: 'Uncategorized',
+        categoryNew: 'New category',
+        categoryNamePlaceholder: 'Category name',
+        categorySave: 'Save',
+        categoryRename: 'Rename',
+        categoryDelete: 'Delete category',
+        categoryEmptyTitle: 'No books in this category',
+        categoryEmptyText: 'Use the category button on a book cover to move it here.',
+        importFolder: 'Import folder',
+        folderNoEpub: 'No EPUB files found in that folder',
+        folderImported: 'Imported {count} book(s) from the folder',
         library: 'My shelf',
         libraryMeta: '{books} books · {mentions} mentions',
         loading: 'Loading…',
