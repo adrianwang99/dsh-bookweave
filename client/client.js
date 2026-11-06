@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.19.0';
+    const CLIENT_VERSION = '0.19.1';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -2005,6 +2005,48 @@ window.__ModuleLoader__.load({
       return output;
     }
 
+    async function translateOnce(lang, blocks) {
+      const response = await fetch('/api/dsh-bookweave/translate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-dsh-bookweave': '1' },
+        body: JSON.stringify({ targetLang: lang, blocks: blocks }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (response.status === 401 || response.status === 404) {
+        const error = new Error('translate-host-outdated');
+        error.code = 'translate-host-outdated';
+        throw error;
+      }
+      if (!response.ok || !payload || payload.ok !== true) {
+        const detail = payload && (payload.message || payload.error);
+        const error = new Error(String(detail || ('HTTP ' + response.status)).slice(0, 140));
+        error.code = payload && payload.error;
+        throw error;
+      }
+      return payload;
+    }
+
+    async function requestTranslationBlocks(lang, blocks, depth) {
+      const attempt = depth || 0;
+      try {
+        return await translateOnce(lang, blocks);
+      } catch (error) {
+        if (error && error.code === 'translate-host-outdated') throw error;
+        // 模型输出坏了：把批次拆小重试，避免整章失败。
+        if (error && error.code === 'bad-model-output' && blocks.length > 1 && attempt < 3) {
+          const middle = Math.ceil(blocks.length / 2);
+          const left = await requestTranslationBlocks(lang, blocks.slice(0, middle), attempt + 1);
+          const right = await requestTranslationBlocks(lang, blocks.slice(middle), attempt + 1);
+          return { ok: true, blocks: (left.blocks || []).concat(right.blocks || []), model: left.model || right.model || '' };
+        }
+        if (attempt === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          return requestTranslationBlocks(lang, blocks, 1);
+        }
+        throw error;
+      }
+    }
+
     async function runLimited(tasks, limit) {
       const results = new Array(tasks.length);
       let next = 0;
@@ -2500,6 +2542,19 @@ window.__ModuleLoader__.load({
       '.bw-translate-panel__bar i{display:block;height:100%;background:var(--dsw-alias-brand-primary);transition:width .2s ease}',
       '.bw-translate-panel__status{font-size:10.5px;line-height:1.5;color:var(--dsw-alias-label-secondary)}',
       '.bw-translate-panel__status--error{color:var(--dsw-alias-state-error-primary)}',
+      '.bw-center--translating .bw-center__scroll{filter:blur(7px);pointer-events:none;user-select:none}',
+      '.bw-center--translating .bw-center__foot{opacity:.5;pointer-events:none}',
+      '.bw-translate-mask{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;padding:20px;background:color-mix(in srgb,var(--dsw-alias-bg-layer-1) 45%,transparent);backdrop-filter:blur(3px)}',
+      '.bw-translate-mask__card{width:min(430px,86%);display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:14px;box-shadow:0 18px 44px rgba(0,0,0,.32);padding:20px}',
+      '.bw-translate-mask__title{font-size:14px;font-weight:650;color:var(--dsw-alias-label-primary)}',
+      '.bw-translate-mask__bar{width:100%;height:6px;border-radius:4px;background:var(--dsw-alias-bg-layer-2);overflow:hidden}',
+      '.bw-translate-mask__bar i{display:block;height:100%;background:var(--dsw-alias-brand-primary);transition:width .2s ease}',
+      '.bw-translate-mask__count{font-size:12px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
+      '.bw-translate-mask__hint{font-size:11.5px;line-height:1.6;color:var(--dsw-alias-label-secondary)}',
+      '.bw-bgjob{position:fixed;left:18px;bottom:18px;z-index:80;display:flex;align-items:center;gap:10px;max-width:min(440px,90vw);padding:9px 12px;border-radius:10px;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);box-shadow:0 10px 28px rgba(0,0,0,.22);font-size:12px;color:var(--dsw-alias-label-primary)}',
+      '.bw-bgjob__text{flex:1 1 auto;min-width:0;line-height:1.5}',
+      '.bw-bgjob__stop{flex:none;font:inherit;font-size:11px;padding:3px 8px;border-radius:6px;border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer}',
+      '.bw-bgjob__stop:hover{color:var(--dsw-alias-label-primary)}',
       '.bw-translation{position:relative;font-size:calc(15px * var(--bw-scale,1));line-height:1.9;color:var(--dsw-alias-label-primary);margin-top:10px;padding-left:10px;border-left:2px solid color-mix(in srgb,var(--dsw-alias-brand-primary) 40%,transparent);font-family:inherit;white-space:pre-wrap;word-break:break-word}',
       '.bw-thought-underline{text-decoration-line:underline;text-decoration-style:dashed;text-decoration-thickness:1.5px;text-underline-offset:3px;text-decoration-skip-ink:none}',
       '.bw-thought-pop{position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.32)}',
@@ -3023,6 +3078,10 @@ window.__ModuleLoader__.load({
       const [renamingCategory, setRenamingCategory] = React.useState('');
       const [renameDraft, setRenameDraft] = React.useState('');
       const [categoryMenuId, setCategoryMenuId] = React.useState('');
+      const [translateJob, setTranslateJob] = React.useState(null);
+      const translateJobRef = React.useRef(null);
+      const translateStopRef = React.useRef(false);
+      const translateRunRef = React.useRef(0);
       const inputRef = React.useRef(null);
       const folderRef = React.useRef(null);
       const rootRef = React.useRef(null);
@@ -3348,6 +3407,142 @@ window.__ModuleLoader__.load({
         if (activeCategory === id) setActiveCategory('all');
       }
 
+      function publishTranslateJob(patch) {
+        const current = translateJobRef.current;
+        if (!current) return;
+        const next = Object.assign({}, current, patch);
+        translateJobRef.current = next;
+        if (aliveRef.current) setTranslateJob(next);
+      }
+
+      function stopBookTranslation() {
+        const current = translateJobRef.current;
+        if (!current || !current.running) return;
+        translateStopRef.current = true;
+        publishTranslateJob({ status: 'stopping' });
+      }
+
+      async function startBookTranslation(record, language) {
+        const current = translateJobRef.current;
+        if (current && current.running) return;
+        const runId = ++translateRunRef.current;
+        translateStopRef.current = false;
+        const working = Object.assign({}, record.translations || {});
+        working[language] = Object.assign({}, working[language] || {});
+        const title = (record.meta && record.meta.title) || record.name || '';
+        const publish = (patch) => {
+          publishTranslateJob(
+            Object.assign(
+              {
+                bookId: record.id,
+                title: title,
+                lang: language,
+                translations: working,
+              },
+              patch
+            )
+          );
+        };
+        translateJobRef.current = {
+          bookId: record.id,
+          title: title,
+          lang: language,
+          translations: working,
+          running: true,
+          done: 0,
+          total: 0,
+          status: 'running',
+          error: '',
+        };
+        if (aliveRef.current) setTranslateJob(translateJobRef.current);
+        const jobs = [];
+        let total = 0;
+        for (let ci = 0; ci < record.chapters.length; ci += 1) {
+          const chapter = record.chapters[ci];
+          const existing = (working[language] || {})[ci] || {};
+          const byText = new Map();
+          for (let bi = 0; bi < (chapter.blocks || []).length; bi += 1) {
+            const text = String(chapter.blocks[bi].text || '');
+            if (existing[bi]) continue;
+            if (!needsTranslation(text, language)) continue;
+            if (!byText.has(text)) byText.set(text, []);
+            byText.get(text).push(bi);
+          }
+          if (!byText.size) continue;
+          const unique = Array.from(byText.keys()).map((text, index) => ({ i: index, text: text }));
+          const indexMap = new Map(unique.map((item) => [item.i, byText.get(item.text)]));
+          const batches = [];
+          let batch = [];
+          let chars = 0;
+          for (const item of unique) {
+            if (chars + item.text.length > 2000 && batch.length) {
+              batches.push(batch);
+              batch = [];
+              chars = 0;
+            }
+            batch.push(item);
+            chars += item.text.length;
+          }
+          if (batch.length) batches.push(batch);
+          total += unique.length;
+          jobs.push({ chapterIndex: ci, batches: batches, indexMap: indexMap });
+        }
+        publish({ done: 0, total: total, running: true, status: 'running', error: '' });
+        if (!total) {
+          publish({ running: false, status: 'done' });
+          return;
+        }
+        let done = 0;
+        let partial = null;
+        try {
+          for (const job of jobs) {
+            if (translateStopRef.current || runId !== translateRunRef.current) break;
+            const chapterMap = Object.assign({}, working[language][job.chapterIndex] || {});
+            partial = { chapterIndex: job.chapterIndex, chapterMap: chapterMap };
+            const tasks = job.batches.map((batch) => async () => {
+              if (translateStopRef.current || runId !== translateRunRef.current) return;
+              const payload = await requestTranslationBlocks(language, batch);
+              for (const item of payload.blocks || []) {
+                const targets = job.indexMap.get(item.i) || [];
+                for (const blockIndex of targets) chapterMap[blockIndex] = item.text;
+              }
+              done += batch.length;
+              if (runId === translateRunRef.current) publish({ done: done, total: total, running: true, status: 'running' });
+            });
+            await runLimited(tasks, 3);
+            if (runId !== translateRunRef.current) return;
+            working[language][job.chapterIndex] = chapterMap;
+            dbUpdateBook(record.id, { translations: working }).catch(() => {});
+            publish({ done: done, total: total, running: true, status: 'running', translations: working });
+          }
+          if (runId !== translateRunRef.current) return;
+          if (translateStopRef.current) publish({ running: false, status: 'stopped', translations: working });
+          else {
+            publish({ running: false, status: 'done', translations: working });
+            notify(t('translateDone'));
+          }
+        } catch (error) {
+          if (runId === translateRunRef.current) {
+            const outdated = error && error.code === 'translate-host-outdated';
+            publish({
+              running: false,
+              status: 'error',
+              error: outdated ? t('translateHostOutdated') : String((error && error.message) || '').slice(0, 140),
+              translations: working,
+            });
+            notify(t(outdated ? 'translateHostOutdated' : 'translateFailed'));
+            if (typeof console !== 'undefined' && console.error) console.error('[dsh-bookweave] translate failed', error);
+          }
+        } finally {
+          if (partial && runId === translateRunRef.current) {
+            working[language][partial.chapterIndex] = partial.chapterMap;
+            dbUpdateBook(record.id, { translations: working }).catch(() => {});
+            if (translateStopRef.current) publish({ running: false, status: 'stopped', translations: working });
+            else publish({ translations: working });
+          }
+        }
+      }
+
       async function assignCategory(bookId, categoryId) {
         await dbSaveSummary(bookId, { categoryId: categoryId || '' });
         setLibrary((current) => current.map((item) => (item.id === bookId ? Object.assign({}, item, { categoryId: categoryId || '' }) : item)));
@@ -3620,6 +3815,9 @@ window.__ModuleLoader__.load({
               onProgress: (progress) => queueProgress(record.id, progress),
               onNotify: notify,
               onExport: exportBook,
+              translationJob: translateJob,
+              onStartTranslation: (language) => startBookTranslation(record, language),
+              onStopTranslation: stopBookTranslation,
             })
           : null;
 
@@ -3676,6 +3874,21 @@ window.__ModuleLoader__.load({
         }),
         error
           ? h('div', { style: { padding: '0 20px 8px' } }, h(ErrorBanner, { t: t, message: error, onDismiss: () => setError('') }))
+          : null,
+        view !== 'reader' && translateJob && translateJob.running
+          ? h(
+              'div',
+              { className: 'bw-bgjob', role: 'status', 'aria-live': 'polite' },
+              h(
+                'span',
+                { className: 'bw-bgjob__text' },
+                t('bgTranslating')
+                  .replace('{title}', translateJob.title || '')
+                  .replace('{done}', String(translateJob.done || 0))
+                  .replace('{total}', String(translateJob.total || 0))
+              ),
+              h('button', { type: 'button', className: 'bw-bgjob__stop', onClick: stopBookTranslation }, t('translateStop'))
+            )
           : null,
         reader ||
           h(
@@ -3943,18 +4156,16 @@ window.__ModuleLoader__.load({
       const [thoughts, setThoughts] = React.useState([]);
       const [thoughtDraft, setThoughtDraft] = React.useState(null);
       const [translationLang, setTranslationLang] = React.useState(() => readTranslateLang(record));
-      const [translationsData, setTranslationsData] = React.useState(() => (record.translations && typeof record.translations === 'object' ? record.translations : {}));
-      const [translationRunning, setTranslationRunning] = React.useState(false);
-      const [translationProgress, setTranslationProgress] = React.useState({ done: 0, total: 0 });
-      const [translationStatus, setTranslationStatus] = React.useState('');
-      const [translationError, setTranslationError] = React.useState('');
       const [translationPanelOpen, setTranslationPanelOpen] = React.useState(false);
-      const translationStopRef = React.useRef(false);
-      const translationRunRef = React.useRef(0);
-      const translationsRef = React.useRef(translationsData);
-      React.useEffect(() => {
-        translationsRef.current = translationsData;
-      }, [translationsData]);
+      const translationJob = props.translationJob && props.translationJob.bookId === record.id ? props.translationJob : null;
+      const translationsData = (translationJob && translationJob.translations) || record.translations || {};
+      const translationRunning = !!(translationJob && translationJob.running);
+      const translationProgress = translationJob
+        ? { done: translationJob.done || 0, total: translationJob.total || 0 }
+        : { done: 0, total: 0 };
+      const translationStatus = translationJob ? translationJob.status : '';
+      const translationError = translationJob ? translationJob.error : '';
+      const otherTranslationRunning = !!(props.translationJob && props.translationJob.running && props.translationJob.bookId !== record.id);
       const [thoughtsOpen, setThoughtsOpen] = React.useState(() => {
         try {
           const value = window.localStorage.getItem(THOUGHTS_OPEN_KEY);
@@ -4208,129 +4419,6 @@ window.__ModuleLoader__.load({
         }
         setThoughtDraft(null);
         if (props.onNotify) props.onNotify(t('thoughtSaved'));
-      }
-
-      async function requestTranslationBlocks(lang, blocks) {
-        const response = await fetch('/api/dsh-bookweave/translate', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', 'x-dsh-bookweave': '1' },
-          body: JSON.stringify({ targetLang: lang, blocks: blocks }),
-        });
-        const payload = await response.json().catch(() => null);
-        if (response.status === 401 || response.status === 404) {
-          const error = new Error('translate-host-outdated');
-          error.code = 'translate-host-outdated';
-          throw error;
-        }
-        if (!response.ok || !payload || payload.ok !== true) {
-          const detail = payload && (payload.message || payload.error);
-          const error = new Error(String(detail || ('HTTP ' + response.status)).slice(0, 140));
-          error.code = payload && payload.error;
-          throw error;
-        }
-        return payload;
-      }
-
-      function stopTranslation() {
-        if (!translationRunning) return;
-        translationStopRef.current = true;
-        setTranslationStatus('stopping');
-      }
-
-      async function startTranslation() {
-        if (translationRunning) return;
-        const lang = translationLang;
-        const runId = ++translationRunRef.current;
-        translationStopRef.current = false;
-        setTranslationRunning(true);
-        setTranslationStatus('running');
-        setTranslationError('');
-        const jobs = [];
-        let total = 0;
-        for (let ci = 0; ci < chapters.length; ci++) {
-          const chapter = chapters[ci];
-          const existing = (translationsRef.current[lang] || {})[ci] || {};
-          const byText = new Map();
-          for (let bi = 0; bi < (chapter.blocks || []).length; bi++) {
-            const text = String(chapter.blocks[bi].text || '');
-            if (existing[bi]) continue;
-            if (!needsTranslation(text, lang)) continue;
-            if (!byText.has(text)) byText.set(text, []);
-            byText.get(text).push(bi);
-          }
-          if (!byText.size) continue;
-          const unique = Array.from(byText.keys()).map((text, index) => ({ i: index, text: text }));
-          const indexMap = new Map(unique.map((item) => [item.i, byText.get(item.text)]));
-          const batches = [];
-          let current = [];
-          let chars = 0;
-          for (const item of unique) {
-            if (chars + item.text.length > 2600 && current.length) {
-              batches.push(current);
-              current = [];
-              chars = 0;
-            }
-            current.push(item);
-            chars += item.text.length;
-          }
-          if (current.length) batches.push(current);
-          total += unique.length;
-          jobs.push({ chapterIndex: ci, batches: batches, indexMap: indexMap });
-        }
-        setTranslationProgress({ done: 0, total: total });
-        if (!total) {
-          setTranslationRunning(false);
-          setTranslationStatus('done');
-          return;
-        }
-        let done = 0;
-        const working = Object.assign({}, translationsRef.current);
-        working[lang] = Object.assign({}, working[lang] || {});
-        let partial = null;
-        try {
-          for (const job of jobs) {
-            if (translationStopRef.current || runId !== translationRunRef.current) break;
-            const chapterMap = Object.assign({}, working[lang][job.chapterIndex] || {});
-            partial = { chapterIndex: job.chapterIndex, chapterMap: chapterMap };
-            const tasks = job.batches.map((batch) => async () => {
-              if (translationStopRef.current || runId !== translationRunRef.current) return;
-              const payload = await requestTranslationBlocks(lang, batch);
-              for (const item of payload.blocks || []) {
-                const targets = job.indexMap.get(item.i) || [];
-                for (const blockIndex of targets) chapterMap[blockIndex] = item.text;
-              }
-              done += batch.length;
-              if (runId === translationRunRef.current) setTranslationProgress({ done: done, total: total });
-            });
-            await runLimited(tasks, 3);
-            if (runId !== translationRunRef.current) return;
-            working[lang][job.chapterIndex] = chapterMap;
-            setTranslationsData(Object.assign({}, working));
-            dbUpdateBook(record.id, { translations: working }).catch(() => {});
-          }
-          if (runId !== translationRunRef.current) return;
-          if (translationStopRef.current) setTranslationStatus('stopped');
-          else {
-            setTranslationStatus('done');
-            if (props.onNotify) props.onNotify(t('translateDone'));
-          }
-        } catch (error) {
-          if (runId === translationRunRef.current) {
-            const outdated = error && error.code === 'translate-host-outdated';
-            setTranslationStatus('error');
-            setTranslationError(outdated ? t('translateHostOutdated') : String((error && error.message) || '').slice(0, 140));
-            if (props.onNotify) props.onNotify(t(outdated ? 'translateHostOutdated' : 'translateFailed'));
-            if (typeof console !== 'undefined' && console.error) console.error('[dsh-bookweave] translate failed', error);
-          }
-        } finally {
-          if (partial && runId === translationRunRef.current) {
-            working[lang][partial.chapterIndex] = partial.chapterMap;
-            translationsRef.current = working;
-            setTranslationsData(Object.assign({}, working));
-            dbUpdateBook(record.id, { translations: working }).catch(() => {});
-          }
-          if (runId === translationRunRef.current) setTranslationRunning(false);
-        }
       }
 
       function thoughtSource(thought) {
@@ -4613,7 +4701,7 @@ window.__ModuleLoader__.load({
             showToc ? h(TocRail, { t: t, chapters: chapters, chapterIndex: chapterIndex, chapterMentions: chapterMentions, onSelect: goChapter }) : null,
             h(
               'section',
-              { className: 'bw-center', style: { '--bw-scale': String(scale) } },
+              { className: cx('bw-center', translationRunning && 'bw-center--translating'), style: { '--bw-scale': String(scale) } },
               h(
                 'div',
                 { className: 'bw-float bw-float--left' },
@@ -4671,12 +4759,12 @@ window.__ModuleLoader__.load({
                           { className: 'bw-translate-panel__actions' },
                           h(
                             'button',
-                            { type: 'button', className: 'bw-btn bw-btn--sm bw-btn--primary', onClick: startTranslation, disabled: translationRunning },
+                            { type: 'button', className: 'bw-btn bw-btn--sm bw-btn--primary', onClick: () => props.onStartTranslation && props.onStartTranslation(translationLang), disabled: translationRunning || otherTranslationRunning },
                             t('translateStart')
                           ),
                           h(
                             'button',
-                            { type: 'button', className: 'bw-btn bw-btn--sm', onClick: stopTranslation, disabled: !translationRunning || translationStatus === 'stopping' },
+                            { type: 'button', className: 'bw-btn bw-btn--sm', onClick: () => props.onStopTranslation && props.onStopTranslation(), disabled: !translationRunning || translationStatus === 'stopping' },
                             t('translateStop')
                           )
                         ),
@@ -4698,8 +4786,10 @@ window.__ModuleLoader__.load({
                               )
                             )
                           : null,
-                        translationStatus === 'done'
-                          ? h('div', { className: 'bw-translate-panel__status' }, t('translateDone'))
+                        otherTranslationRunning
+                          ? h('div', { className: 'bw-translate-panel__status' }, t('translateBusyOther'))
+                          : translationStatus === 'done'
+                            ? h('div', { className: 'bw-translate-panel__status' }, t('translateDone'))
                           : translationStatus === 'stopped'
                             ? h('div', { className: 'bw-translate-panel__status' }, t('translateStopped'))
                             : translationStatus === 'stopping'
@@ -4892,7 +4982,36 @@ window.__ModuleLoader__.load({
                 h('span', { className: 'bw-count' }, t('chapterPosition').replace('{current}', String(chapterIndex + 1)).replace('{total}', String(chapters.length))),
                 h('div', { className: 'bw-spacer' }),
                 h('button', { type: 'button', className: 'bw-btn bw-btn--sm', onClick: () => goChapter(chapterIndex + 1), disabled: chapterIndex >= chapters.length - 1 }, t('nextChapter') + ' ›')
-              )
+              ),
+              translationRunning
+                ? h(
+                    'div',
+                    { className: 'bw-translate-mask', role: 'status', 'aria-live': 'polite' },
+                    h(
+                      'div',
+                      { className: 'bw-translate-mask__card' },
+                      h('div', { className: 'bw-translate-mask__title' }, t('translatingTitle')),
+                      h(
+                        'div',
+                        { className: 'bw-translate-mask__bar' },
+                        h('i', { style: { width: Math.round((translationProgress.done / Math.max(1, translationProgress.total)) * 100) + '%' } })
+                      ),
+                      h(
+                        'div',
+                        { className: 'bw-translate-mask__count' },
+                        t('translateProgress')
+                          .replace('{done}', String(translationProgress.done))
+                          .replace('{total}', String(translationProgress.total))
+                      ),
+                      h('div', { className: 'bw-translate-mask__hint' }, t('translatingHint')),
+                      h(
+                        'button',
+                        { type: 'button', className: 'bw-btn bw-btn--sm', onClick: () => props.onStopTranslation && props.onStopTranslation() },
+                        t('translateStop')
+                      )
+                    )
+                  )
+                : null
             ),
             showRail
               ? h(InsightsRail, {
@@ -5835,8 +5954,13 @@ window.__ModuleLoader__.load({
         translateStop: '停止翻译',
         translateProgress: '已翻译 {done}/{total} 段',
         translateDone: '翻译完成',
+        translateBusyOther: '另一本书正在后台翻译，请先停止它',
         translateStopped: '已停止翻译',
         translateStopping: '正在停止…',
+        translatingTitle: '正在翻译本书',
+        translatingHint: '翻译完成后即可继续阅读；也可以先退出本书，翻译会在后台继续。',
+        bgTranslating: '正在后台翻译《{title}》{done}/{total} 段',
+
 
         translateOff: '关闭翻译',
         translating: '翻译中…',
@@ -6049,8 +6173,13 @@ window.__ModuleLoader__.load({
         translateStop: 'Stop translation',
         translateProgress: 'Translated {done}/{total} paragraphs',
         translateDone: 'Translation complete',
+        translateBusyOther: 'Another book is translating in the background; stop it first.',
         translateStopped: 'Translation stopped',
         translateStopping: 'Stopping…',
+        translatingTitle: 'Translating this book',
+        translatingHint: 'The text is blurred until translation finishes. You can leave the book — translation keeps running in the background.',
+        bgTranslating: 'Translating “{title}” in the background — {done}/{total}',
+
 
         translateOff: 'Turn off translation',
         translating: 'Translating…',

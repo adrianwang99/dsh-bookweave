@@ -175,7 +175,7 @@ check('reasoning 取最低档', __test.lowestEffort({ reasoning: { efforts: [{ i
   const translatePayload = JSON.parse(translateRes.body);
   check('翻译 handler 返回 200', translateRes.statusCode === 200, translateRes.body);
   check('翻译输出可渲染', translatePayload.ok === true && translatePayload.blocks.length === 1 && translatePayload.blocks[0].text === 'Hello');
-  check('翻译 token 上限', translateLlm.calls[0].maxTokens === 2400);
+  check('翻译 token 上限', translateLlm.calls[0].maxTokens === 3600);
   check('翻译 prompt 使用目标语言', String(translateLlm.calls[0].messages[0].content[0].text).includes('English'));
 }
 

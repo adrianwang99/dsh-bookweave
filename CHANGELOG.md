@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.19.1] - 2025-11-06
+
+- While a translation job runs, the prose is blurred behind a progress overlay (“come back when it is done”), with progress count and a stop button.
+- Translation now runs at the app/shelf level: leaving the book keeps it translating in the background; a shelf banner shows live progress and can stop it.
+- Malformed model output (`bad-model-output`) is retried and the batch is split into halves (up to 3 levels) so one bad response no longer aborts the whole book.
+- Starting a translation while another book is translating is blocked with an explanatory message.
+
 ## [0.19.0] - 2025-11-06
 
 - Translation is now part of the book: translated paragraphs persist in the book record (`translations`) and are rendered under each source paragraph as body text, surviving reopens and restarts.
