@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.15.0] - 2025-11-06
+
+- “Excerpts & notes” entries now all use one action-card design: badge, chapter/time, text, and always-visible Locate / Note / Edit / Delete buttons.
+- List entries use the system font; the handwriting font is reserved for the margin notes themselves.
+
 ## [0.14.0] - 2025-11-06
 
 - Renamed the “Excerpts” tab to **Excerpts & notes**; it now merges manual excerpts and margin thoughts in reading order.

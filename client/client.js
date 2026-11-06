@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.14.0';
+    const CLIENT_VERSION = '0.15.0';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -1889,6 +1889,20 @@ window.__ModuleLoader__.load({
       '.bw-chip{font:inherit;font-size:11.5px;height:24px;padding:0 8px;border-radius:99px;border:1px solid var(--dsw-alias-border-l2);background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer}',
       '.bw-chip:hover{background:var(--dsw-alias-bg-layer-2)}',
       '.bw-chip--on{background:var(--dsw-alias-brand-primary);border-color:transparent;color:var(--dsw-alias-label-primary-foreground)}',
+      '.bw-ecards{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}',
+      '.bw-ecard{border:1px solid var(--dsw-alias-border-l1);border-radius:10px;background:var(--dsw-alias-bg-layer-1);padding:10px;display:flex;flex-direction:column;gap:6px;cursor:pointer;transition:border-color .15s}',
+      '.bw-ecard:hover{border-color:var(--dsw-alias-border-l2)}',
+      '.bw-ecard--active{border-color:var(--dsw-alias-brand-primary)}',
+      '.bw-ecard__head{display:flex;align-items:center;gap:6px;flex-wrap:wrap}',
+      '.bw-ecard__index{font-size:10.5px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
+      '.bw-ecard__meta{display:flex;gap:6px;flex-wrap:wrap;font-size:10.5px;color:var(--dsw-alias-label-secondary);line-height:1.5}',
+      '.bw-ecard__source{font-size:10.5px;color:var(--dsw-alias-label-secondary);font-style:italic;line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}',
+      '.bw-ecard__text{font-size:12.5px;line-height:1.7;color:var(--dsw-alias-label-primary);word-break:break-word;white-space:pre-wrap}',
+      '.bw-ecard__note{font-size:11.5px;color:var(--dsw-alias-label-secondary);line-height:1.6;white-space:pre-wrap;border-left:2px solid var(--dsw-alias-border-l2);padding-left:7px}',
+      '.bw-ecard__actions{display:flex;gap:10px;flex-wrap:wrap;padding-top:2px}',
+      '.bw-ecard__btn{font:inherit;font-size:11px;background:none;border:0;padding:0;color:var(--dsw-alias-label-secondary);cursor:pointer}',
+      '.bw-ecard__btn:hover{color:var(--dsw-alias-label-primary)}',
+      '.bw-ecard__btn:first-child{color:var(--dsw-alias-brand-primary);font-weight:600}',
       '.bw-list{display:flex;flex-direction:column;gap:4px;margin:0;padding:0;list-style:none}',
       '.bw-item{border-radius:9px;border:1px solid transparent;padding:7px 8px;cursor:pointer;transition:background .12s,border-color .12s}',
       '.bw-item:hover{background:var(--dsw-alias-bg-layer-2)}',
@@ -2271,6 +2285,7 @@ window.__ModuleLoader__.load({
       const t = props.t;
       const excerpts = props.excerpts || [];
       const thoughts = props.thoughts || [];
+      const [noteOpenId, setNoteOpenId] = React.useState('');
       if (!excerpts.length && !thoughts.length) {
         return h(
           'div',
@@ -2299,111 +2314,103 @@ window.__ModuleLoader__.load({
         h('div', { className: 'bw-rail__meta' }, t('excerptMeta').replace('{count}', String(entries.length))),
         h(
           'ul',
-          { className: 'bw-list' },
+          { className: 'bw-ecards' },
           entries.map((entry, index) => {
             const item = entry.item;
-            const selected = props.selectedId === item.id;
             const isThought = entry.kind === 'thought';
             const isExcerpt = entry.kind === 'excerpt';
+            const active = props.selectedId === item.id;
+            const noteOpen = isExcerpt && noteOpenId === item.id;
             return h(
               'li',
-              {
-                key: item.id,
-                className: cx('bw-item', selected && 'bw-item--active'),
-                role: 'button',
-                tabIndex: 0,
-                'aria-expanded': selected ? 'true' : 'false',
-                onClick: () => props.onSelect(item.id),
-                onKeyDown: (event) => {
-                  if (event.target !== event.currentTarget) return;
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    props.onSelect(item.id);
-                  }
-                },
-              },
+              { key: item.id, className: cx('bw-ecard', active && 'bw-ecard--active'), onClick: () => props.onSelect(item.id) },
               h(
                 'div',
-                { className: 'bw-item__head' },
-                h('span', { className: 'bw-item__index' }, String(index + 1)),
+                { className: 'bw-ecard__head' },
+                h('span', { className: 'bw-ecard__index' }, String(index + 1)),
+                h('span', { className: 'bw-badge bw-badge--muted' }, isThought ? t('thoughtKind') : t('excerptKind')),
                 h(
-                  'div',
-                  { className: 'bw-item__main' },
-                  isThought && item.sourceText ? h('span', { className: 'bw-item__source' }, '「' + item.sourceText + '」') : null,
-                  h(
-                    'span',
-                    { className: cx('bw-item__title', isThought ? 'bw-thought-list-text' : 'bw-excerpt__text'), style: isThought ? { color: item.color || '#7aa2ff' } : undefined },
-                    item.text
-                  ),
-                  h(
-                    'span',
-                    { className: 'bw-item__meta' },
-                    h('span', { className: 'bw-badge bw-badge--muted' }, isThought ? t('thoughtKind') : t('excerptKind')),
-                    h('span', null, item.chapterTitle || '第 ' + (item.chapterIndex + 1) + ' 章'),
-                    h('span', null, formatExcerptTime(item.createdAt)),
-                    isExcerpt && item.note ? h('span', null, t('excerptHasNote')) : null
-                  )
+                  'span',
+                  { className: 'bw-ecard__meta' },
+                  h('span', null, item.chapterTitle || '第 ' + (item.chapterIndex + 1) + ' 章'),
+                  h('span', null, formatExcerptTime(item.createdAt))
                 )
               ),
-              selected
-                ? h(
-                    'div',
-                    { className: 'bw-detail' },
-                    isExcerpt
-                      ? h('textarea', {
-                          className: 'bw-note',
-                          value: item.note || '',
-                          placeholder: t('excerptNotePlaceholder'),
-                          'aria-label': t('excerptNote'),
-                          onClick: (event) => event.stopPropagation(),
-                          onChange: (event) => props.onNote(item.id, event.target.value),
-                        })
-                      : null,
-                    h(
-                      'div',
-                      { className: 'bw-detail__actions' },
-                      h(
-                        'button',
-                        {
-                          type: 'button',
-                          className: 'bw-btn bw-btn--sm',
-                          onClick: (event) => {
-                            event.stopPropagation();
-                            if (isThought) props.onThoughtLocate(item);
-                            else props.onLocate(item);
-                          },
+              isThought && item.sourceText ? h('div', { className: 'bw-ecard__source' }, '「' + item.sourceText + '」') : null,
+              h(
+                'div',
+                { className: 'bw-ecard__text', style: isThought ? { color: item.color || '#7aa2ff' } : undefined },
+                item.text
+              ),
+              isExcerpt && item.note ? h('div', { className: 'bw-ecard__note' }, item.note) : null,
+              h(
+                'div',
+                { className: 'bw-ecard__actions' },
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'bw-ecard__btn',
+                    onClick: (event) => {
+                      event.stopPropagation();
+                      if (isThought) props.onThoughtLocate(item);
+                      else props.onLocate(item);
+                    },
+                  },
+                  t('locate')
+                ),
+                isExcerpt
+                  ? h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'bw-ecard__btn',
+                        onClick: (event) => {
+                          event.stopPropagation();
+                          props.onSelect(item.id);
+                          setNoteOpenId(noteOpen ? '' : item.id);
                         },
-                        t('locate')
-                      ),
-                      isThought
-                        ? h(
-                            'button',
-                            {
-                              type: 'button',
-                              className: 'bw-btn bw-btn--sm bw-btn--ghost',
-                              onClick: (event) => {
-                                event.stopPropagation();
-                                props.onThoughtEdit(item);
-                              },
-                            },
-                            t('thoughtEdit')
-                          )
-                        : null,
-                      h(
-                        'button',
-                        {
-                          type: 'button',
-                          className: 'bw-btn bw-btn--sm bw-btn--ghost',
-                          onClick: (event) => {
-                            event.stopPropagation();
-                            if (isThought) props.onThoughtDelete(item.id);
-                            else props.onDelete(item.id);
-                          },
-                        },
-                        t('delete')
-                      )
+                      },
+                      t('excerptNote')
                     )
-                  )
+                  : null,
+                isThought
+                  ? h(
+                      'button',
+                      {
+                        type: 'button',
+                        className: 'bw-ecard__btn',
+                        onClick: (event) => {
+                          event.stopPropagation();
+                          props.onThoughtEdit(item);
+                        },
+                      },
+                      t('thoughtEdit')
+                    )
+                  : null,
+                h(
+                  'button',
+                  {
+                    type: 'button',
+                    className: 'bw-ecard__btn',
+                    onClick: (event) => {
+                      event.stopPropagation();
+                      if (isThought) props.onThoughtDelete(item.id);
+                      else props.onDelete(item.id);
+                    },
+                  },
+                  t('delete')
+                )
+              ),
+              noteOpen
+                ? h('textarea', {
+                    className: 'bw-note',
+                    value: item.note || '',
+                    placeholder: t('excerptNotePlaceholder'),
+                    'aria-label': t('excerptNote'),
+                    onClick: (event) => event.stopPropagation(),
+                    onChange: (event) => props.onNote(item.id, event.target.value),
+                  })
                 : null
             );
           })
@@ -4678,7 +4685,7 @@ window.__ModuleLoader__.load({
         saveExcerpt: '摘录',
         excerptSaved: '已保存摘录',
         excerptNote: '笔记',
-        excerptNotePlaceholder: '写点想法…',
+        excerptNotePlaceholder: '给这条摘录写笔记…',
         excerptHasNote: '有笔记',
         excerptKind: '摘录',
         thoughtKind: '想法',
@@ -4865,7 +4872,7 @@ window.__ModuleLoader__.load({
         saveExcerpt: 'Excerpt',
         excerptSaved: 'Excerpt saved',
         excerptNote: 'Note',
-        excerptNotePlaceholder: 'Add a note…',
+        excerptNotePlaceholder: 'Add a note to this excerpt…',
         excerptHasNote: 'Has note',
         excerptKind: 'Excerpt',
         thoughtKind: 'Note',
