@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.11.0] - 2025-11-06
+
+- Narrower reading column; the freed right margin is now a **thought margin** (边注): notes render in a handwriting font, aligned with the paragraph or excerpt they belong to.
+- Add a thought from the selection toolbar (“想法”) or the “+” in the margin; edit/delete inline; thoughts are stored per book in IndexedDB (`thoughts` store).
+- On narrow containers the thoughts move below the paragraph instead of the side margin.
+
 ## [0.10.1] - 2025-11-04
 
 - The right-rail guide now opens on the chapter you are currently reading (using saved progress) and follows TOC / prev-next / locate chapter changes.

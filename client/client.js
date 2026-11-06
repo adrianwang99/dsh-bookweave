@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.10.1';
+    const CLIENT_VERSION = '0.11.0';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -1426,12 +1426,13 @@ window.__ModuleLoader__.load({
 
     // ---- 本机存储（IndexedDB：books 存正文，index 存书架摘要）--------------
     const DB_NAME = 'dsh-bookweave';
-    const DB_VERSION = 3;
+    const DB_VERSION = 4;
     let dbPromise = null;
     // IndexedDB 不可用时的会话内兜底：书签式存储失败仍然能读，只是刷新后需要重新导入。
     const memoryBooks = new Map();
     const memoryIndex = new Map();
     const memoryExcerpts = new Map();
+    const memoryThoughts = new Map();
     const memoryInsights = new Map();
     let idbDown = false;
 
@@ -1466,6 +1467,7 @@ window.__ModuleLoader__.load({
           if (!db.objectStoreNames.contains('index')) db.createObjectStore('index', { keyPath: 'id' });
           if (!db.objectStoreNames.contains('excerpts')) db.createObjectStore('excerpts', { keyPath: 'bookId' });
           if (!db.objectStoreNames.contains('insights')) db.createObjectStore('insights', { keyPath: 'key' });
+          if (!db.objectStoreNames.contains('thoughts')) db.createObjectStore('thoughts', { keyPath: 'bookId' });
         };
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => {
@@ -1591,6 +1593,35 @@ window.__ModuleLoader__.load({
       } catch (error) {
         markIdbDown();
         return local || [];
+      }
+    }
+
+    async function dbGetThoughts(bookId) {
+      const local = memoryThoughts.get(bookId);
+      if (idbDown) return local || [];
+      try {
+        const db = await openDatabase();
+        const tx = db.transaction('thoughts', 'readonly');
+        const record = await idbRequest(tx.objectStore('thoughts').get(bookId));
+        return record && Array.isArray(record.items) ? record.items : [];
+      } catch (error) {
+        markIdbDown();
+        return local || [];
+      }
+    }
+
+    async function dbSaveThoughts(bookId, items) {
+      memoryThoughts.set(bookId, items);
+      if (idbDown) return false;
+      try {
+        const db = await openDatabase();
+        await runTransaction(db, 'thoughts', 'readwrite', (tx) => {
+          tx.objectStore('thoughts').put({ bookId, items, updatedAt: Date.now() });
+        });
+        return true;
+      } catch (error) {
+        markIdbDown();
+        return false;
       }
     }
 
@@ -1821,7 +1852,7 @@ window.__ModuleLoader__.load({
       '.bw-center{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:column;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);overflow:hidden;position:relative}',
       '.bw-center__scroll{flex:1 1 auto;overflow:auto;padding:14px 34px 36px;scroll-behavior:smooth}',
       '.bw-center__foot{flex:none;display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1)}',
-      '.bw-prose{max-width:720px;margin:0 auto;font-family:"Songti SC","Noto Serif SC","Source Han Serif SC",Georgia,"Times New Roman",serif;font-size:calc(16px * var(--bw-scale,1));line-height:1.95;word-break:break-word}',
+      '.bw-prose{max-width:880px;margin:0 auto;font-family:"Songti SC","Noto Serif SC","Source Han Serif SC",Georgia,"Times New Roman",serif;font-size:calc(16px * var(--bw-scale,1));line-height:1.95;word-break:break-word}',
       '.bw-prose p{margin:0 0 14px}.bw-prose p.bw-prose__cjk{text-indent:2em}',
       '.bw-prose h1,.bw-prose h2,.bw-prose h3,.bw-prose h4{margin:26px 0 14px;line-height:1.4;font-family:inherit}',
       '.bw-prose h1{font-size:1.5em}.bw-prose h2{font-size:1.28em}.bw-prose h3{font-size:1.12em}.bw-prose h4{font-size:1em}',
@@ -1891,6 +1922,7 @@ window.__ModuleLoader__.load({
       '.bw-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}',
       '@container (max-width:900px){.bw-toc{position:absolute;left:0;top:0;bottom:0;width:232px;z-index:6;box-shadow:8px 0 22px rgba(0,0,0,.14)}}',
       '@container (max-width:980px){.bw-rail{position:absolute;right:0;top:0;bottom:0;width:min(92%,340px);z-index:6;box-shadow:-8px 0 22px rgba(0,0,0,.14)}}',
+      '@container (max-width:900px){.bw-block{flex-wrap:wrap;gap:6px}.bw-block__text{flex:1 1 100%;max-width:none}.bw-block__margin{flex:1 1 100%;width:auto}.bw-thought-add{opacity:1}}',
       '@container (max-width:640px){.bw-main{padding:0 12px 12px}.bw-center__scroll{padding:18px 14px 32px}.bw-brand__sub{display:none}}',
       '.bw-selbar{display:flex;gap:6px;padding:5px;border-radius:9px;background:var(--dsw-alias-bg-overlay);border:1px solid var(--dsw-alias-border-l2);box-shadow:0 6px 20px rgba(0,0,0,.18)}',
       '.bw-browser{position:absolute;inset:0;z-index:50;display:flex;flex-direction:column;background:var(--dsw-alias-bg-base);padding:calc(12px + var(--dsh-frame-top-clearance,0px)) 16px 12px}',
@@ -1992,7 +2024,7 @@ window.__ModuleLoader__.load({
       '.bw-gcard__text{font-size:12px;line-height:1.65;color:var(--dsw-alias-label-primary);word-break:break-word}',
       '.bw-gcard__loc{font-size:10px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
       '.bw-gcard__evidence{display:flex;flex-direction:column;gap:4px;padding:4px 0 0 8px;margin-left:12px;border-left:1px dashed var(--dsw-alias-border-l2)}',
-      '.bw-block{margin:0 -6px;padding:0 6px;border-radius:8px;transition:background .12s,box-shadow .12s}',
+      '.bw-block{display:flex;gap:22px;align-items:flex-start;margin:0 -6px;padding:0 6px;border-radius:8px;transition:background .12s,box-shadow .12s}',
       '.bw-block--focus{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 9%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--dsw-alias-brand-primary) 22%,transparent)}',
       '.bw-block--flash{animation:bw-flash 1.6s ease}',
       '@keyframes bw-flash{0%{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 20%,transparent)}70%{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 12%,transparent)}100%{background:transparent}}',
@@ -2048,6 +2080,21 @@ window.__ModuleLoader__.load({
       '.bw-float__btn:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}',
       '.bw-float__btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.bw-float__btn--primary{color:var(--dsw-alias-label-primary);font-weight:600}',
+      '.bw-block__text{flex:0 1 600px;min-width:0;max-width:600px}',
+      '.bw-block__margin{flex:0 0 220px;width:220px;padding-top:2px;display:flex;flex-direction:column;gap:8px;min-width:0}',
+      '.bw-masthead,.bw-prose>h1{max-width:600px}',
+      '.bw-thought{display:flex;flex-direction:column;gap:4px;padding:2px 0 2px 9px;border-left:2px solid color-mix(in srgb,var(--dsw-alias-brand-primary) 42%,transparent)}',
+      '.bw-thought__quote{font-size:10.5px;line-height:1.6;color:var(--dsw-alias-label-secondary);font-style:italic;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}',
+      '.bw-thought__text{font-family:"Xingkai SC","Kaiti SC","STKaiti","KaiTi","Segoe Script","Bradley Hand",cursive;font-size:14.5px;line-height:1.75;color:color-mix(in srgb,var(--dsw-alias-label-primary) 88%,var(--dsw-alias-brand-primary));white-space:pre-wrap;word-break:break-word}',
+      '.bw-thought__ops{display:flex;gap:8px;opacity:0;transition:opacity .12s}',
+      '.bw-thought:hover .bw-thought__ops,.bw-thought:focus-within .bw-thought__ops,.bw-thought__ops--on{opacity:1}',
+      '.bw-thought__op{font:inherit;font-size:10.5px;padding:0;background:none;border:0;color:var(--dsw-alias-label-secondary);cursor:pointer}',
+      '.bw-thought__op:hover{color:var(--dsw-alias-label-primary)}',
+      '.bw-thought__op--primary{color:var(--dsw-alias-brand-primary);font-weight:650}',
+      '.bw-thought__input{width:100%;min-height:64px;resize:vertical;font-family:"Xingkai SC","Kaiti SC","STKaiti","KaiTi","Segoe Script",cursive;font-size:14px;line-height:1.7;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-base);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:6px 8px}',
+      '.bw-thought__input:focus{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-1px}',
+      '.bw-thought-add{align-self:flex-start;font:inherit;font-size:10.5px;padding:3px 7px;border:1px dashed var(--dsw-alias-border-l2);border-radius:7px;background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;opacity:0;transition:opacity .12s}',
+      '.bw-block:hover .bw-thought-add,.bw-thought-add:focus-visible{opacity:1}',
       '.bw-masthead{padding:26px 0 10px}',
       '.bw-masthead__title{font-size:20px;font-weight:700;line-height:1.4;color:var(--dsw-alias-label-primary);letter-spacing:.01em}',
       '.bw-masthead__meta{font-size:11.5px;color:var(--dsw-alias-label-secondary);margin-top:5px}',
@@ -2971,6 +3018,8 @@ window.__ModuleLoader__.load({
       const [selectedKey, setSelectedKey] = React.useState('');
       const [scale, setScale] = React.useState(1);
       const [excerpts, setExcerpts] = React.useState([]);
+      const [thoughts, setThoughts] = React.useState([]);
+      const [thoughtDraft, setThoughtDraft] = React.useState(null);
       const [selectedExcerptId, setSelectedExcerptId] = React.useState('');
       const [pendingSelection, setPendingSelection] = React.useState(null);
       const [browserUrl, setBrowserUrl] = React.useState('');
@@ -3087,6 +3136,22 @@ window.__ModuleLoader__.load({
         };
       }, [record.id]);
 
+      React.useEffect(() => {
+        let alive = true;
+        dbGetThoughts(record.id)
+          .then((items) => {
+            if (alive && Array.isArray(items)) setThoughts(items);
+          })
+          .catch(() => {});
+        return () => {
+          alive = false;
+        };
+      }, [record.id]);
+
+      React.useEffect(() => {
+        setThoughtDraft(null);
+      }, [chapterIndex]);
+
       function handleScroll(event) {
         const node = event.currentTarget;
         const max = Math.max(1, node.scrollHeight - node.clientHeight);
@@ -3097,6 +3162,54 @@ window.__ModuleLoader__.load({
       function commitExcerpts(next) {
         setExcerpts(next);
         dbSaveExcerpts(record.id, next).catch(() => {});
+      }
+
+      function commitThoughts(next) {
+        setThoughts(next);
+        dbSaveThoughts(record.id, next).catch(() => {});
+      }
+
+      function startThought(blockIndex, quote) {
+        setThoughtDraft({ id: '', chapterIndex: chapterIndex, blockIndex: blockIndex, text: '', quote: quote || '' });
+      }
+
+      function startThoughtFromSelection() {
+        if (!pendingSelection) return;
+        startThought(pendingSelection.startBlock, pendingSelection.text.slice(0, 180));
+        clearSelection();
+      }
+
+      function editThought(thought) {
+        setThoughtDraft({ id: thought.id, chapterIndex: thought.chapterIndex, blockIndex: thought.blockIndex, text: thought.text, quote: thought.quote || '' });
+      }
+
+      function saveThought() {
+        if (!thoughtDraft) return;
+        const value = String(thoughtDraft.text || '').trim();
+        if (!value) {
+          setThoughtDraft(null);
+          return;
+        }
+        if (thoughtDraft.id) {
+          commitThoughts(thoughts.map((item) => (item.id === thoughtDraft.id ? Object.assign({}, item, { text: value, updatedAt: Date.now() }) : item)));
+        } else {
+          const thought = {
+            id: 'th-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+            chapterIndex: thoughtDraft.chapterIndex,
+            blockIndex: thoughtDraft.blockIndex,
+            quote: thoughtDraft.quote || '',
+            text: value,
+            createdAt: Date.now(),
+          };
+          commitThoughts([thought].concat(thoughts));
+        }
+        setThoughtDraft(null);
+        if (props.onNotify) props.onNotify(t('thoughtSaved'));
+      }
+
+      function deleteThought(id) {
+        commitThoughts(thoughts.filter((item) => item.id !== id));
+        if (thoughtDraft && thoughtDraft.id === id) setThoughtDraft(null);
       }
 
       function clearSelection() {
@@ -3377,22 +3490,71 @@ window.__ModuleLoader__.load({
                     const blockIndex = index + blockOffset;
                     const focused = sourceFocus && sourceFocus.chapterIndex === chapterIndex && sourceFocus.blockIndex === blockIndex;
                     const flashed = flashBlock && flashBlock.chapterIndex === chapterIndex && flashBlock.blockIndex === blockIndex;
+                    const blockThoughts = thoughts.filter((item) => item.chapterIndex === chapterIndex && item.blockIndex === blockIndex);
+                    const draftHere = thoughtDraft && thoughtDraft.chapterIndex === chapterIndex && thoughtDraft.blockIndex === blockIndex ? thoughtDraft : null;
+                    const editor = (draft) =>
+                      h(
+                        'div',
+                        { key: 'draft', className: 'bw-thought bw-thought--edit' },
+                        draft.quote ? h('div', { className: 'bw-thought__quote' }, '「' + draft.quote + '」') : null,
+                        h('textarea', {
+                          className: 'bw-thought__input',
+                          value: draft.text,
+                          rows: 3,
+                          autoFocus: true,
+                          placeholder: t('thoughtPlaceholder'),
+                          onChange: (event) => setThoughtDraft(Object.assign({}, draft, { text: event.target.value })),
+                          onKeyDown: (event) => {
+                            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) saveThought();
+                          },
+                        }),
+                        h(
+                          'div',
+                          { className: 'bw-thought__ops bw-thought__ops--on' },
+                          h('button', { type: 'button', className: 'bw-thought__op bw-thought__op--primary', onClick: saveThought }, t('thoughtSave')),
+                          h('button', { type: 'button', className: 'bw-thought__op', onClick: () => setThoughtDraft(null) }, t('thoughtCancel'))
+                        )
+                      );
+                    const card = (thought) =>
+                      h(
+                        'div',
+                        { key: thought.id, className: 'bw-thought' },
+                        thought.quote ? h('div', { className: 'bw-thought__quote' }, '「' + thought.quote + '」') : null,
+                        h('div', { className: 'bw-thought__text' }, thought.text),
+                        h(
+                          'div',
+                          { className: 'bw-thought__ops' },
+                          h('button', { type: 'button', className: 'bw-thought__op', onClick: () => editThought(thought) }, t('thoughtEdit')),
+                          h('button', { type: 'button', className: 'bw-thought__op', onClick: () => deleteThought(thought.id) }, t('thoughtDelete'))
+                        )
+                      );
                     return h(
                       'div',
                       { key: blockIndex, 'data-block': blockIndex, className: cx('bw-block', focused && 'bw-block--focus', flashed && 'bw-block--flash') },
-                      h(ProseBlock, {
-                        block: block,
-                        blockIndex: blockIndex,
-                        chapterIndex: chapterIndex,
-                        excerpts: excerpts,
-                        highlight: highlight,
-                        onMention: onMention,
-                        onExcerpt: (id) => {
-                          setSelectedExcerptId(id);
-                          setTab('excerpts');
-                          setShowRail(true);
-                        },
-                      })
+                      h(
+                        'div',
+                        { className: 'bw-block__text' },
+                        h(ProseBlock, {
+                          block: block,
+                          blockIndex: blockIndex,
+                          chapterIndex: chapterIndex,
+                          excerpts: excerpts,
+                          highlight: highlight,
+                          onMention: onMention,
+                          onExcerpt: (id) => {
+                            setSelectedExcerptId(id);
+                            setTab('excerpts');
+                            setShowRail(true);
+                          },
+                        })
+                      ),
+                      h(
+                        'div',
+                        { className: 'bw-block__margin' },
+                        blockThoughts.map((thought) => (draftHere && draftHere.id === thought.id ? editor(draftHere) : card(thought))),
+                        draftHere && !draftHere.id ? editor(draftHere) : null,
+                        !draftHere ? h('button', { type: 'button', className: 'bw-thought-add', onClick: () => startThought(blockIndex) }, '+ ' + t('thoughtAdd')) : null
+                      )
                     );
                   })
                 )
@@ -3455,6 +3617,11 @@ window.__ModuleLoader__.load({
                 },
                 role: 'toolbar',
               },
+              h(
+                'button',
+                { type: 'button', className: 'bw-btn bw-btn--sm bw-btn--ghost', onMouseDown: (event) => event.preventDefault(), onClick: startThoughtFromSelection },
+                t('thoughtAdd')
+              ),
               h(
                 'button',
                 { type: 'button', className: 'bw-btn bw-btn--sm bw-btn--primary', onMouseDown: (event) => event.preventDefault(), onClick: saveSelectionAsExcerpt },
@@ -4208,6 +4375,13 @@ window.__ModuleLoader__.load({
         stageExtract: '正在扫描书名…',
         stageSave: '正在保存到本机…',
         cancel: '取消',
+        thoughtAdd: '想法',
+        thoughtPlaceholder: '写点你的想法…',
+        thoughtSave: '保存',
+        thoughtCancel: '取消',
+        thoughtEdit: '编辑',
+        thoughtDelete: '删除',
+        thoughtSaved: '想法已保存',
         searchSource: '搜索源',
         searchTemplate: '搜索地址模板',
         searchTemplateHint: '用 {query} 代表书名，例如 https://openlibrary.org/search?q={query}；保存后「搜索书籍」会使用它。',
@@ -4383,6 +4557,13 @@ window.__ModuleLoader__.load({
         stageExtract: 'Scanning book titles…',
         stageSave: 'Saving locally…',
         cancel: 'Cancel',
+        thoughtAdd: 'Note',
+        thoughtPlaceholder: 'Write your thought…',
+        thoughtSave: 'Save',
+        thoughtCancel: 'Cancel',
+        thoughtEdit: 'Edit',
+        thoughtDelete: 'Delete',
+        thoughtSaved: 'Note saved',
         searchSource: 'Search source',
         searchTemplate: 'Search URL template',
         searchTemplateHint: 'Use {query} for the book title, e.g. https://openlibrary.org/search?q={query}. Saved value is used by “Search book”.',
