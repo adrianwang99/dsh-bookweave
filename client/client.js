@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.18.5';
+    const CLIENT_VERSION = '0.18.6';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -2460,7 +2460,8 @@ window.__ModuleLoader__.load({
       '.bw-prose--collapsed .bw-block__margin{display:none}',
       '.bw-prose--collapsed .bw-masthead,.bw-prose--collapsed>h1{max-width:720px}',
       '.bw-block__body{position:relative}',
-      '.bw-thought-bar{position:absolute;right:-16px;top:0;bottom:0;width:14px;border:0;padding:0;background:transparent;cursor:pointer;display:flex;justify-content:center;align-items:stretch;z-index:2;animation:bw-bar-in .3s ease}',
+      '.bw-thought-bars{position:absolute;right:-16px;top:0;bottom:0;width:14px;pointer-events:none;z-index:2}',
+      '.bw-thought-bar{position:absolute;left:0;width:14px;height:4px;margin-top:-2px;border:0;padding:0;background:transparent;cursor:pointer;display:flex;justify-content:center;align-items:stretch;pointer-events:auto;animation:bw-bar-in .3s ease}',
       '.bw-thought-bar::before{content:"";width:3px;border-radius:2px;background:var(--bw-thought-color,#7aa2ff);transition:width .15s ease}',
       '.bw-thought-bar:hover::before{width:5px}',
       '@keyframes bw-bar-in{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}',
@@ -3898,6 +3899,7 @@ window.__ModuleLoader__.load({
       const [translateOn, setTranslateOn] = React.useState(() => readTranslateOn());
       const [translations, setTranslations] = React.useState({});
       const [translateStatus, setTranslateStatus] = React.useState('');
+      const [translateError, setTranslateError] = React.useState('');
       const [translateProgress, setTranslateProgress] = React.useState(null);
       const [translateMenuOpen, setTranslateMenuOpen] = React.useState(false);
       const translateTokenRef = React.useRef(0);
@@ -4009,6 +4011,7 @@ window.__ModuleLoader__.load({
       React.useEffect(() => {
         setTranslations({});
         setTranslateStatus('');
+        setTranslateError('');
         setTranslateProgress(null);
         if (!translateOn) return undefined;
         let alive = true;
@@ -4069,7 +4072,17 @@ window.__ModuleLoader__.load({
                 body: JSON.stringify({ targetLang: translateLang, blocks: batch }),
               });
               const payload = await response.json().catch(() => null);
-              if (!response.ok || !payload || payload.ok !== true) throw new Error((payload && payload.error) || 'translate-failed');
+              if (response.status === 401 || response.status === 404) {
+                const error = new Error('translate-host-outdated');
+                error.code = 'translate-host-outdated';
+                throw error;
+              }
+              if (!response.ok || !payload || payload.ok !== true) {
+                const detail = payload && (payload.message || payload.error);
+                const error = new Error(String(detail || ('HTTP ' + response.status)).slice(0, 140));
+                error.code = payload && payload.error;
+                throw error;
+              }
               model = payload.model || model;
               doneBatches += 1;
               for (const item of payload.blocks || []) {
@@ -4088,11 +4101,21 @@ window.__ModuleLoader__.load({
               setTranslateStatus('done');
               dbSaveTranslation({ key, bookId: record.id, chapterIndex, lang: translateLang, signature, blocks: merged, model, createdAt: Date.now() }).catch(() => {});
             } catch (error) {
-              if (alive && token === translateTokenRef.current) setTranslateStatus('error');
+              if (alive && token === translateTokenRef.current) {
+                const outdated = error && error.code === 'translate-host-outdated';
+                setTranslateStatus(outdated ? 'host-outdated' : 'error');
+                setTranslateError(outdated ? '' : String((error && error.message) || '').slice(0, 140));
+                if (props.onNotify) props.onNotify(t(outdated ? 'translateHostOutdated' : 'translateFailed'));
+                if (typeof console !== 'undefined' && console.error) console.error('[dsh-bookweave] translate failed', error);
+              }
             }
           })
-          .catch(() => {
-            if (alive && token === translateTokenRef.current) setTranslateStatus('error');
+          .catch((error) => {
+            if (alive && token === translateTokenRef.current) {
+              setTranslateStatus('error');
+              setTranslateError(String((error && error.message) || '').slice(0, 140));
+              if (typeof console !== 'undefined' && console.error) console.error('[dsh-bookweave] translate load failed', error);
+            }
           });
         return () => {
           alive = false;
@@ -4593,9 +4616,15 @@ window.__ModuleLoader__.load({
                               { className: 'bw-translate-menu__status' },
                               t('translating') + (translateProgress ? ' ' + translateProgress.done + '/' + translateProgress.total : '')
                             )
-                          : translateStatus === 'error'
-                            ? h('div', { className: 'bw-translate-menu__status bw-translate-menu__status--error' }, t('translateFailed'))
-                            : null
+                          : translateStatus === 'host-outdated'
+                            ? h('div', { className: 'bw-translate-menu__status bw-translate-menu__status--error' }, t('translateHostOutdated'))
+                            : translateStatus === 'error'
+                              ? h(
+                                  'div',
+                                  { className: 'bw-translate-menu__status bw-translate-menu__status--error' },
+                                  t('translateFailed') + (translateError ? ' · ' + translateError : '')
+                                )
+                              : null
                       )
                     : null
                 ),
@@ -4694,14 +4723,38 @@ window.__ModuleLoader__.load({
                             },
                           }),
                           !thoughtsOpen && blockThoughts.length
-                            ? h('button', {
-                                type: 'button',
-                                className: 'bw-thought-bar',
-                                style: { '--bw-thought-color': blockThoughts[blockThoughts.length - 1].color || THOUGHT_COLORS[0] },
-                                onClick: toggleThoughts,
-                                'aria-label': t('thoughtsExpand'),
-                                title: t('thoughtsExpand'),
-                              })
+                            ? h(
+                                'div',
+                                { className: 'bw-thought-bars' },
+                                blockThoughts
+                                  .slice()
+                                  .sort((a, b) => {
+                                    const aStart = a.startOffset == null ? Number.MAX_SAFE_INTEGER : a.startOffset;
+                                    const bStart = b.startOffset == null ? Number.MAX_SAFE_INTEGER : b.startOffset;
+                                    return aStart - bStart || (a.createdAt || 0) - (b.createdAt || 0);
+                                  })
+                                  .map((thought, markerIndex) => {
+                                    const total = String(block.text || '').length || 1;
+                                    const ratio =
+                                      thought.startOffset != null
+                                        ? Math.min(1, Math.max(0, thought.startOffset / total))
+                                        : blockThoughts.length > 1
+                                          ? markerIndex / blockThoughts.length
+                                          : 0;
+                                    return h('button', {
+                                      key: thought.id,
+                                      type: 'button',
+                                      className: 'bw-thought-bar',
+                                      style: {
+                                        '--bw-thought-color': thought.color || THOUGHT_COLORS[0],
+                                        top: (ratio * 100).toFixed(2) + '%',
+                                      },
+                                      onClick: toggleThoughts,
+                                      'aria-label': t('thoughtsExpand'),
+                                      title: thought.text || t('thoughtsExpand'),
+                                    });
+                                  })
+                              )
                             : null
                         ),
                         translations[blockIndex] ? h('div', { className: 'bw-translation' }, translations[blockIndex]) : null
@@ -5667,6 +5720,7 @@ window.__ModuleLoader__.load({
         translateOff: '关闭翻译',
         translating: '翻译中…',
         translateFailed: '翻译失败',
+        translateHostOutdated: '翻译服务不可用：请完全退出并重开 DSH（⌘Q）以加载新版 Host',
         thoughtsExpand: '展开想法',
         thoughtsCollapse: '折叠想法',
         thoughtColor: '想法颜色',
@@ -5873,6 +5927,7 @@ window.__ModuleLoader__.load({
         translateOff: 'Turn off translation',
         translating: 'Translating…',
         translateFailed: 'Translation failed',
+        translateHostOutdated: 'Translation service unavailable: fully quit and reopen DSH (⌘Q) to load the new Host.',
         thoughtsExpand: 'Show notes',
         thoughtsCollapse: 'Hide notes',
         thoughtColor: 'Note color',

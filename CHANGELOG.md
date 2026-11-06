@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.18.6] - 2025-11-06
+
+- Collapsed margin notes now render one colored marker per thought (positioned by its text offset), instead of a single bar for the whole paragraph.
+- Translation failures are surfaced: 401/404 from the Host shows “translation service unavailable — fully quit and reopen DSH (⌘Q) to load the new Host”; other failures show the model/host error text and are logged.
+
 ## [0.18.5] - 2025-11-06
 
 - When the margin-notes rail is collapsed, starting a thought (selection toolbar → 想法, or editing a note) now opens a floating composer over the page with the source snippet, textarea, color swatches, save and cancel; the hidden margin editor is no longer rendered.
