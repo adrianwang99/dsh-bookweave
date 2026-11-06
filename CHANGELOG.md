@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.12.1] - 2025-11-06
+
+- Collapsed notes no longer reserve layout height (the hidden margin is removed from flow), so the colored marker bar matches its paragraph instead of stretching across an empty gap.
+- Notes fade/slide in when expanded; the reading column still animates its width.
+
 ## [0.12.0] - 2025-11-06
 
 - Thought text now supports six inks; each note stores its color and renders in it.

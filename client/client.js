@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.12.0';
+    const CLIENT_VERSION = '0.12.1';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -2083,16 +2083,17 @@ window.__ModuleLoader__.load({
       '.bw-float__btn:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px}',
       '.bw-float__btn--primary{color:var(--dsw-alias-label-primary);font-weight:600}',
       '.bw-block__text{flex:0 1 600px;min-width:0;max-width:600px;transition:flex-basis .3s ease,max-width .3s ease}',
-      '.bw-block__margin{flex:0 0 220px;width:220px;padding-top:2px;display:flex;flex-direction:column;gap:8px;min-width:0;transition:flex-basis .3s ease,width .3s ease,opacity .2s ease}',
+      '.bw-block__margin{flex:0 0 220px;width:220px;padding-top:2px;display:flex;flex-direction:column;gap:8px;min-width:0;transition:flex-basis .3s ease,width .3s ease,opacity .2s ease;animation:bw-notes-in .25s ease}',
       '.bw-prose--collapsed{max-width:720px}',
       '.bw-prose--collapsed .bw-block{gap:0}',
       '.bw-prose--collapsed .bw-block__text{flex-basis:720px;max-width:720px}',
-      '.bw-prose--collapsed .bw-block__margin{flex-basis:0;width:0;opacity:0;overflow:hidden;pointer-events:none}',
+      '.bw-prose--collapsed .bw-block__margin{display:none}',
       '.bw-prose--collapsed .bw-masthead,.bw-prose--collapsed>h1{max-width:720px}',
       '.bw-thought-bar{position:absolute;right:-16px;top:2px;bottom:2px;width:14px;border:0;padding:0;background:transparent;cursor:pointer;display:flex;justify-content:center;align-items:stretch;z-index:2;animation:bw-bar-in .3s ease}',
       '.bw-thought-bar::before{content:"";width:3px;border-radius:2px;background:var(--bw-thought-color,#7aa2ff);transition:width .15s ease}',
       '.bw-thought-bar:hover::before{width:5px}',
       '@keyframes bw-bar-in{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}',
+      '@keyframes bw-notes-in{from{opacity:0;transform:translateX(6px)}to{opacity:1;transform:none}}',
       '.bw-thought__colors{display:flex;gap:6px;margin:1px 0 2px}',
       '.bw-thought__swatch{width:14px;height:14px;padding:0;border-radius:50%;border:2px solid transparent;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.15)}',
       '.bw-thought__swatch--on{border-color:var(--dsw-alias-label-primary)}',
