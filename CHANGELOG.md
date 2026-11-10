@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.19.2] - 2025-11-10
+
+- Fixed the shelf not scrolling after the category sidebar was added: the right book column now stretches to the available height (`min-height: 0`) and is itself the scroll container, while the category rail scrolls independently.
+
 ## [0.19.1] - 2025-11-06
 
 - While a translation job runs, the prose is blurred behind a progress overlay (“come back when it is done”), with progress count and a stop button.

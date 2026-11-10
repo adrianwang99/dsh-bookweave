@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.19.1';
+    const CLIENT_VERSION = '0.19.2';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -2196,10 +2196,10 @@ window.__ModuleLoader__.load({
       '.bw-section-head{display:flex;align-items:center;gap:8px;margin:20px 0 10px}',
       '.bw-section-head h2{font-size:13.5px;font-weight:650;margin:0;line-height:1.4}',
       '.bw-section-head span{font-size:11.5px;color:var(--dsw-alias-label-secondary)}',
-      '.bw-library{flex:1 1 auto;min-height:0;overflow:auto;padding-right:2px}',
-      '.bw-main--lib{flex-direction:row;align-items:flex-start;gap:14px}',
-      '.bw-lib{flex:1 1 auto;min-width:0;display:flex;flex-direction:column}',
-      '.bw-cats{flex:0 0 190px;min-width:0;display:flex;flex-direction:column;gap:8px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);padding:10px}',
+      '.bw-library{flex:0 0 auto;min-height:0;overflow:visible;padding-right:2px}',
+      '.bw-main--lib{flex-direction:row;align-items:stretch;gap:14px;min-height:0}',
+      '.bw-lib{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto}',
+      '.bw-cats{flex:0 0 190px;min-width:0;min-height:0;max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:8px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);padding:10px}',
       '.bw-cats__head{font-size:11px;font-weight:650;color:var(--dsw-alias-label-secondary);letter-spacing:.03em;padding:2px 4px 2px}',
       '.bw-cats__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}',
       '.bw-cats__row{display:flex;align-items:center;gap:2px;border-radius:7px}',
