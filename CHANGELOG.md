@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Version numbers follow 
 
 ## [Unreleased]
 
+## [0.20.0] - 2025-11-11
+
+- Shelf is now two columns: books on the left, a “Recent excerpts & notes” panel on the right.
+- The right panel aggregates excerpts and thoughts from **all books**, sorted by time, rendered as a two-column card grid showing book title, type badge, text, notes/source and time; clicking a card opens that book at the matching chapter.
+- Book deletion now also removes its stored thoughts; recent data reloads after returning from the reader or deleting a book.
+
 ## [0.19.2] - 2025-11-10
 
 - Fixed the shelf not scrolling after the category sidebar was added: the right book column now stretches to the available height (`min-height: 0`) and is itself the scroll container, while the category rail scrolls independently.

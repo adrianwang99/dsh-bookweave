@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 
     const NS = 'dsh-bookweave';
     const PANEL_ID = 'dsh-bookweave';
-    const CLIENT_VERSION = '0.19.2';
+    const CLIENT_VERSION = '0.20.0';
 
     // =====================================================================
     // 1. Core — pure, testable in Node
@@ -1644,13 +1644,15 @@ window.__ModuleLoader__.load({
       memoryBooks.delete(id);
       memoryIndex.delete(id);
       memoryExcerpts.delete(id);
+      memoryThoughts.delete(id);
       if (idbDown) return false;
       try {
         const db = await openDatabase();
-        await runTransaction(db, ['books', 'index', 'excerpts'], 'readwrite', (tx) => {
+        await runTransaction(db, ['books', 'index', 'excerpts', 'thoughts'], 'readwrite', (tx) => {
           tx.objectStore('books').delete(id);
           tx.objectStore('index').delete(id);
           tx.objectStore('excerpts').delete(id);
+          tx.objectStore('thoughts').delete(id);
         });
         return true;
       } catch (error) {
@@ -1677,6 +1679,32 @@ window.__ModuleLoader__.load({
       } catch (error) {
         markIdbDown();
         return false;
+      }
+    }
+
+    async function dbListAllExcerpts() {
+      if (idbDown) return Array.from(memoryExcerpts.values());
+      try {
+        const db = await openDatabase();
+        const tx = db.transaction('excerpts', 'readonly');
+        const items = await idbRequest(tx.objectStore('excerpts').getAll());
+        return items || [];
+      } catch (error) {
+        markIdbDown();
+        return Array.from(memoryExcerpts.values());
+      }
+    }
+
+    async function dbListAllThoughts() {
+      if (idbDown) return Array.from(memoryThoughts.values());
+      try {
+        const db = await openDatabase();
+        const tx = db.transaction('thoughts', 'readonly');
+        const items = await idbRequest(tx.objectStore('thoughts').getAll());
+        return items || [];
+      } catch (error) {
+        markIdbDown();
+        return Array.from(memoryThoughts.values());
       }
     }
 
@@ -2198,7 +2226,26 @@ window.__ModuleLoader__.load({
       '.bw-section-head span{font-size:11.5px;color:var(--dsw-alias-label-secondary)}',
       '.bw-library{flex:0 0 auto;min-height:0;overflow:visible;padding-right:2px}',
       '.bw-main--lib{flex-direction:row;align-items:stretch;gap:14px;min-height:0}',
-      '.bw-lib{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto}',
+      '.bw-shelf{flex:1 1 auto;min-width:0;min-height:0;display:flex;gap:14px}',
+      '.bw-shelf__books{flex:1 1 auto;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:auto;padding-right:2px}',
+      '.bw-recent{flex:0 0 430px;min-width:0;min-height:0;display:flex;flex-direction:column;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);overflow:hidden}',
+      '.bw-recent__head{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--dsw-alias-border-l1)}',
+      '.bw-recent__title{font-size:12px;font-weight:650;color:var(--dsw-alias-label-primary)}',
+      '.bw-recent__count{margin-left:auto;font-size:10.5px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
+      '.bw-recent__grid{flex:1 1 auto;min-height:0;overflow:auto;padding:8px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-content:start}',
+      '.bw-recent__card{display:flex;flex-direction:column;gap:4px;min-width:0;text-align:left;font:inherit;background:var(--dsw-alias-bg-base);border:1px solid var(--dsw-alias-border-l1);border-radius:9px;padding:8px;color:var(--dsw-alias-label-primary);cursor:pointer;transition:border-color .12s,background .12s}',
+      '.bw-recent__card:hover{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-layer-2)}',
+      '.bw-recent__card:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:1px}',
+      '.bw-recent__meta{display:flex;align-items:center;gap:6px;min-width:0}',
+      '.bw-recent__badge{flex:none;display:inline-flex;align-items:center;height:16px;padding:0 5px;border-radius:4px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:9.5px;font-weight:650}',
+      '.bw-recent__badge--thought{background:color-mix(in srgb,var(--dsw-alias-brand-primary) 18%,transparent);color:var(--dsw-alias-brand-primary)}',
+      '.bw-recent__book{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:var(--dsw-alias-label-secondary)}',
+      '.bw-recent__text{font-size:11.5px;line-height:1.6;word-break:break-word;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;white-space:pre-wrap}',
+      '.bw-recent__note{font-size:10.5px;line-height:1.5;color:var(--dsw-alias-label-secondary);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
+      '.bw-recent__source{font-size:10px;line-height:1.5;color:var(--dsw-alias-label-secondary);border-left:2px solid var(--dsw-alias-border-l2);padding-left:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}',
+      '.bw-recent__time{font-size:9.5px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}',
+      '.bw-recent__empty{flex:1 1 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:18px;text-align:center;font-size:11px;line-height:1.6;color:var(--dsw-alias-label-secondary)}',
+      '.bw-recent__emptyTitle{font-size:12px;font-weight:650;color:var(--dsw-alias-label-primary)}',
       '.bw-cats{flex:0 0 190px;min-width:0;min-height:0;max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:8px;border:1px solid var(--dsw-alias-border-l1);border-radius:12px;background:var(--dsw-alias-bg-layer-1);padding:10px}',
       '.bw-cats__head{font-size:11px;font-weight:650;color:var(--dsw-alias-label-secondary);letter-spacing:.03em;padding:2px 4px 2px}',
       '.bw-cats__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}',
@@ -2223,6 +2270,8 @@ window.__ModuleLoader__.load({
       '.bw-card__catmenu{position:absolute;left:0;bottom:calc(100% + 4px);z-index:30;min-width:140px;max-height:200px;overflow:auto;background:var(--dsw-alias-bg-layer-1);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.2);padding:4px;display:flex;flex-direction:column;gap:2px}',
       '.bw-card__catopt{font:inherit;font-size:11.5px;text-align:left;padding:5px 7px;border:0;border-radius:6px;background:none;color:var(--dsw-alias-label-primary);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.bw-card__catopt:hover{background:var(--dsw-alias-bg-layer-2)}',
+      '@container (max-width:1200px){.bw-recent{flex-basis:380px}}',
+      '@container (max-width:1000px){.bw-shelf{flex-direction:column}.bw-recent{flex:0 0 auto;max-height:52%}}',
       '@container (max-width:760px){.bw-main--lib{flex-direction:column}.bw-cats{flex:1 1 auto;width:100%}}',
       '.bw-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,168px));gap:12px;padding-bottom:10px}',
       '.bw-card{position:relative;display:flex;flex-direction:column;gap:6px;text-align:left;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);',
@@ -3078,6 +3127,7 @@ window.__ModuleLoader__.load({
       const [renamingCategory, setRenamingCategory] = React.useState('');
       const [renameDraft, setRenameDraft] = React.useState('');
       const [categoryMenuId, setCategoryMenuId] = React.useState('');
+      const [recentEntries, setRecentEntries] = React.useState([]);
       const [translateJob, setTranslateJob] = React.useState(null);
       const translateJobRef = React.useRef(null);
       const translateStopRef = React.useRef(false);
@@ -3120,6 +3170,7 @@ window.__ModuleLoader__.load({
             setLibrary(items);
             setCategories(cats || []);
             setReady(true);
+            loadRecent(items);
           })
           .catch((cause) => {
             if (!aliveRef.current) return;
@@ -3147,7 +3198,7 @@ window.__ModuleLoader__.load({
         }, 700);
       }
 
-      async function openBook(id) {
+      async function openBook(id, progressOverride) {
         if (openingId) return;
         setError('');
         setOpeningId(id);
@@ -3161,7 +3212,7 @@ window.__ModuleLoader__.load({
             setLibrary((current) => current.filter((item) => item.id !== id));
             return;
           }
-          const progress = (summary && summary.progress) || stored.progress || { chapterIndex: 0, ratio: 0 };
+          const progress = progressOverride || (summary && summary.progress) || stored.progress || { chapterIndex: 0, ratio: 0 };
           setRecord(Object.assign({}, stored, { progress }));
           setView('reader');
           if (summary) setLibrary((current) => current.map((item) => (item.id === id ? Object.assign({}, item, { lastOpenedAt: Date.now() }) : item)));
@@ -3171,6 +3222,61 @@ window.__ModuleLoader__.load({
         } finally {
           if (aliveRef.current) setOpeningId('');
         }
+      }
+
+      async function loadRecent(booksOverride) {
+        try {
+          const books = booksOverride || library;
+          const byId = new Map(books.map((book) => [book.id, book]));
+          const [excerptRecords, thoughtRecords] = await Promise.all([dbListAllExcerpts(), dbListAllThoughts()]);
+          const entries = [];
+          for (const record of excerptRecords) {
+            const book = record && byId.get(record.bookId);
+            if (!book) continue;
+            for (const item of record.items || []) {
+              if (!item) continue;
+              entries.push({
+                key: record.bookId + '|ex|' + item.id,
+                type: 'excerpt',
+                bookId: record.bookId,
+                bookTitle: book.title || book.name || '',
+                chapterIndex: item.chapterIndex || 0,
+                blockIndex: item.startBlock || 0,
+                text: item.text || '',
+                note: item.note || '',
+                createdAt: item.createdAt || 0,
+              });
+            }
+          }
+          for (const record of thoughtRecords) {
+            const book = record && byId.get(record.bookId);
+            if (!book) continue;
+            for (const item of record.items || []) {
+              if (!item) continue;
+              entries.push({
+                key: record.bookId + '|th|' + item.id,
+                type: 'thought',
+                bookId: record.bookId,
+                bookTitle: book.title || book.name || '',
+                chapterIndex: item.chapterIndex || 0,
+                blockIndex: item.blockIndex || 0,
+                text: item.text || '',
+                sourceText: item.sourceText || '',
+                color: item.color || '',
+                createdAt: item.createdAt || 0,
+              });
+            }
+          }
+          entries.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+          if (aliveRef.current) setRecentEntries(entries);
+        } catch (error) {
+          /* ignore recent load failures; shelf still usable */
+        }
+      }
+
+      function openRecent(entry) {
+        if (!entry) return;
+        openBook(entry.bookId, { chapterIndex: entry.chapterIndex || 0, ratio: 0 });
       }
 
       async function importBookFile(file, options) {
@@ -3562,7 +3668,9 @@ window.__ModuleLoader__.load({
         setDeleteId('');
         try {
           await dbDelete(id);
-          setLibrary((current) => current.filter((item) => item.id !== id));
+          const next = library.filter((item) => item.id !== id);
+          setLibrary(next);
+          loadRecent(next);
           notify(t('deleted'));
         } catch (cause) {
           setError(friendlyError(cause, t));
@@ -3576,6 +3684,7 @@ window.__ModuleLoader__.load({
         dbList()
           .then((items) => {
             if (aliveRef.current) setLibrary(items);
+            loadRecent(items);
           })
           .catch(() => {});
       }
@@ -3930,69 +4039,126 @@ window.__ModuleLoader__.load({
               { className: 'bw-main bw-main--lib' },
               categorySidebar(),
               h(
-              'div',
-              { className: 'bw-lib' },
-              library.length === 0
-                ? h(
-                    'section',
-                    { className: cx('bw-hero', drag && 'bw-hero--drag') },
-                    h('h1', { className: 'bw-hero__title' }, t('heroTitle')),
-                    h('p', { className: 'bw-hero__desc' }, t('heroDesc')),
-                    h(
-                      'button',
-                      { type: 'button', className: 'bw-btn bw-btn--primary', onClick: pickFile, disabled: Boolean(busy) },
-                      t('chooseFile')
-                    ),
-                    h('div', { className: 'bw-hero__hint' }, t('privacy')),
-                h('div', { className: 'bw-hero__hint' }, t('formatHint')),
-                    h(
-                      'div',
-                      { className: 'bw-features' },
-                      h('div', { className: 'bw-feature' }, h('div', { className: 'bw-feature__title' }, t('feature1Title')), h('div', { className: 'bw-feature__text' }, t('feature1Text'))),
-                      h('div', { className: 'bw-feature' }, h('div', { className: 'bw-feature__title' }, t('feature2Title')), h('div', { className: 'bw-feature__text' }, t('feature2Text'))),
-                      h('div', { className: 'bw-feature' }, h('div', { className: 'bw-feature__title' }, t('feature3Title')), h('div', { className: 'bw-feature__text' }, t('feature3Text')))
-                    )
-                  )
-                : null,
-              h(
                 'div',
-                { className: 'bw-section-head', style: library.length === 0 ? { marginTop: 12 } : undefined },
-                h('h2', null, activeCategoryName),
-                h('span', null, ready ? t('libraryMeta').replace('{books}', String(visibleBooks.length)).replace('{mentions}', String(visibleBooks.reduce((sum, item) => sum + (item.mentionCount || 0), 0))) : t('loading'))
-              ),
-              h(
-                'div',
-                { className: 'bw-library' },
-                visibleBooks.length
-                  ? h(
-                      'div',
-                      { className: 'bw-grid' },
-                      visibleBooks.map((item) =>
-                        h(BookCard, {
-                          key: item.id,
-                          t: t,
-                          item: item,
-                          categories: categories,
-                          opening: openingId === item.id,
-                          deleting: deleteId === item.id,
-                          onOpen: () => openBook(item.id),
-                          onDelete: (event) => {
-                            event.stopPropagation();
-                            removeBook(item.id);
-                          },
-                          onCategory: assignCategory,
-                        })
+                { className: 'bw-shelf' },
+                h(
+                  'div',
+                  { className: 'bw-shelf__books' },
+                  library.length === 0
+                    ? h(
+                        'section',
+                        { className: cx('bw-hero', drag && 'bw-hero--drag') },
+                        h('h1', { className: 'bw-hero__title' }, t('heroTitle')),
+                        h('p', { className: 'bw-hero__desc' }, t('heroDesc')),
+                        h(
+                          'button',
+                          { type: 'button', className: 'bw-btn bw-btn--primary', onClick: pickFile, disabled: Boolean(busy) },
+                          t('chooseFile')
+                        ),
+                        h('div', { className: 'bw-hero__hint' }, t('privacy')),
+                        h('div', { className: 'bw-hero__hint' }, t('formatHint')),
+                        h(
+                          'div',
+                          { className: 'bw-features' },
+                          h('div', { className: 'bw-feature' }, h('div', { className: 'bw-feature__title' }, t('feature1Title')), h('div', { className: 'bw-feature__text' }, t('feature1Text'))),
+                          h('div', { className: 'bw-feature' }, h('div', { className: 'bw-feature__title' }, t('feature2Title')), h('div', { className: 'bw-feature__text' }, t('feature2Text'))),
+                          h('div', { className: 'bw-feature' }, h('div', { className: 'bw-feature__title' }, t('feature3Title')), h('div', { className: 'bw-feature__text' }, t('feature3Text')))
+                        )
                       )
-                    )
-                  : h(
-                      'div',
-                      { className: 'bw-empty' },
-                      h('div', { className: 'bw-empty__title' }, library.length ? t('categoryEmptyTitle') : t('libraryEmptyTitle')),
-                      h('div', null, library.length ? t('categoryEmptyText') : t('libraryEmptyText'))
-                    )
-              ),
-              ),
-              h('div', { className: 'bw-version' }, '书脉 BookWeave v' + CLIENT_VERSION)
+                    : null,
+                  h(
+                    'div',
+                    { className: 'bw-section-head', style: library.length === 0 ? { marginTop: 12 } : undefined },
+                    h('h2', null, activeCategoryName),
+                    h('span', null, ready ? t('libraryMeta').replace('{books}', String(visibleBooks.length)).replace('{mentions}', String(visibleBooks.reduce((sum, item) => sum + (item.mentionCount || 0), 0))) : t('loading'))
+                  ),
+                  h(
+                    'div',
+                    { className: 'bw-library' },
+                    visibleBooks.length
+                      ? h(
+                          'div',
+                          { className: 'bw-grid' },
+                          visibleBooks.map((item) =>
+                            h(BookCard, {
+                              key: item.id,
+                              t: t,
+                              item: item,
+                              categories: categories,
+                              opening: openingId === item.id,
+                              deleting: deleteId === item.id,
+                              onOpen: () => openBook(item.id),
+                              onDelete: (event) => {
+                                event.stopPropagation();
+                                removeBook(item.id);
+                              },
+                              onCategory: assignCategory,
+                            })
+                          )
+                        )
+                      : h(
+                          'div',
+                          { className: 'bw-empty' },
+                          h('div', { className: 'bw-empty__title' }, library.length ? t('categoryEmptyTitle') : t('libraryEmptyTitle')),
+                          h('div', null, library.length ? t('categoryEmptyText') : t('libraryEmptyText'))
+                        )
+                  ),
+                  h('div', { className: 'bw-version' }, '书脉 BookWeave v' + CLIENT_VERSION)
+                ),
+                h(
+                  'aside',
+                  { className: 'bw-recent', 'aria-label': t('recentTitle') },
+                  h(
+                    'div',
+                    { className: 'bw-recent__head' },
+                    h('span', { className: 'bw-recent__title' }, t('recentTitle')),
+                    h('span', { className: 'bw-recent__count' }, String(recentEntries.length))
+                  ),
+                  recentEntries.length
+                    ? h(
+                        'div',
+                        { className: 'bw-recent__grid' },
+                        recentEntries.map((entry) =>
+                          h(
+                            'button',
+                            {
+                              key: entry.key,
+                              type: 'button',
+                              className: 'bw-recent__card',
+                              onClick: () => openRecent(entry),
+                            },
+                            h(
+                              'div',
+                              { className: 'bw-recent__meta' },
+                              h(
+                                'span',
+                                { className: cx('bw-recent__badge', entry.type === 'thought' && 'bw-recent__badge--thought') },
+                                t(entry.type === 'thought' ? 'thoughtAdd' : 'saveExcerpt')
+                              ),
+                              h('span', { className: 'bw-recent__book' }, entry.bookTitle)
+                            ),
+                            h(
+                              'div',
+                              {
+                                className: 'bw-recent__text',
+                                style: entry.type === 'thought' && entry.color ? { color: entry.color } : undefined,
+                              },
+                              entry.text
+                            ),
+                            entry.note ? h('div', { className: 'bw-recent__note' }, entry.note) : null,
+                            entry.sourceText ? h('div', { className: 'bw-recent__source' }, '「' + entry.sourceText + '」') : null,
+                            h('div', { className: 'bw-recent__time' }, entry.createdAt ? formatExcerptTime(entry.createdAt) : '')
+                          )
+                        )
+                      )
+                    : h(
+                        'div',
+                        { className: 'bw-recent__empty' },
+                        h('div', { className: 'bw-recent__emptyTitle' }, t('recentEmptyTitle')),
+                        h('div', null, t('recentEmptyText'))
+                      )
+                )
+              )
             )
           ),
         busy
@@ -5868,6 +6034,10 @@ window.__ModuleLoader__.load({
         feature3Text: '同一段落提到的书会被连成一本书的知识网络，可导出 Markdown 书单。',
         categories: '分类',
         categoryAll: '全部',
+        recentTitle: '最近摘录和想法',
+        recentEmptyTitle: '还没有摘录或想法',
+        recentEmptyText: '阅读时划词摘录或写下想法，所有书籍的内容都会汇总到这里。',
+
         categoryUncategorized: '未分类',
         categoryNew: '新建分类',
         categoryNamePlaceholder: '分类名称',
@@ -6087,6 +6257,10 @@ window.__ModuleLoader__.load({
         feature3Text: 'Books mentioned in the same paragraph get linked; export the list as Markdown.',
         categories: 'Categories',
         categoryAll: 'All books',
+        recentTitle: 'Recent excerpts & notes',
+        recentEmptyTitle: 'No excerpts or notes yet',
+        recentEmptyText: 'Highlight text or write a note while reading; everything from all books is collected here.',
+
         categoryUncategorized: 'Uncategorized',
         categoryNew: 'New category',
         categoryNamePlaceholder: 'Category name',
